@@ -1,0 +1,630 @@
+{
+  "_comment": [
+    "由 scripts/extract_skills.py 从职业标准原文抽取生成。",
+    "每条技能的 sources[].quote 均已通过程序核验：",
+    "必须是来源 chunk 原文中一字不差的连续片段（忽略空白差异）。",
+    "provenance = llm_drafted —— 尚未经真实教师审核，勿标为 human_reviewed。"
+  ],
+  "job": "ai_data_annotator",
+  "source_doc_id": "doc_ai_trainer_std_2021",
+  "skills": [
+    {
+      "skill_code": "soft.learning",
+      "name_zh": "学习能力",
+      "name_en": "Learning Ability",
+      "category": "soft",
+      "description": "持续获取和掌握新知识、新技能的职业素养",
+      "aliases": [
+        "学习力",
+        "Learning"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#5",
+          "page": "1",
+          "section": "1.6 职业能力特征",
+          "quote": "学习能力"
+        }
+      ]
+    },
+    {
+      "skill_code": "soft.communication",
+      "name_zh": "表达能力",
+      "name_en": "Communication Skills",
+      "category": "soft",
+      "description": "清晰传递信息和想法的职业素养",
+      "aliases": [
+        "沟通能力",
+        "Communication"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#5",
+          "page": "1",
+          "section": "1.6 职业能力特征",
+          "quote": "表达能力"
+        }
+      ]
+    },
+    {
+      "skill_code": "tool.office_software",
+      "name_zh": "办公软件使用",
+      "name_en": "Office Software Usage",
+      "category": "tool",
+      "description": "熟练使用常用办公软件",
+      "aliases": [
+        "办公自动化",
+        "Office Applications"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#9",
+          "page": "4",
+          "section": "2.2 基础知识",
+          "quote": "常用办公软件使用知识。"
+        }
+      ]
+    },
+    {
+      "skill_code": "data.computer_operation",
+      "name_zh": "计算机操作",
+      "name_en": "Computer Operation",
+      "category": "data",
+      "description": "掌握计算机基本操作技能",
+      "aliases": [
+        "电脑操作",
+        "PC Operation"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#9",
+          "page": "4",
+          "section": "2.2 基础知识",
+          "quote": "计算机操作知识。"
+        }
+      ]
+    },
+    {
+      "skill_code": "data.collection",
+      "name_zh": "业务数据采集",
+      "name_en": "Business Data Collection",
+      "category": "data",
+      "description": "使用设备和工具完成原始业务数据采集或从数据库采集业务数据。",
+      "aliases": [
+        "数据采集",
+        "Data Collection"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#10",
+          "page": "6",
+          "section": "1.1 业务",
+          "quote": "能利用设备、工具等完成原始业务数据采集\n1.1.2 能完成数据库内业务数据采集"
+        }
+      ]
+    },
+    {
+      "skill_code": "data.organization",
+      "name_zh": "业务数据整理归类",
+      "name_en": "Business Data Organization",
+      "category": "data",
+      "description": "根据数据处理要求对业务数据进行整理和归类。",
+      "aliases": [
+        "数据整理",
+        "Data Organization"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#10",
+          "page": "6",
+          "section": "1.2 业务",
+          "quote": "能根据数据处理要求完成业务数据整理归类"
+        }
+      ]
+    },
+    {
+      "skill_code": "data.cleaning",
+      "name_zh": "数据清洗",
+      "name_en": "Data Cleaning",
+      "category": "data",
+      "description": "按标注规范对文本、图像、语音原始数据进行清洗预处理。",
+      "aliases": [
+        "数据预处理",
+        "Data Cleaning",
+        "清洗"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#10",
+          "page": "6",
+          "section": "2.1 原始",
+          "quote": "能根据标注规范和要求, 完成文本、视觉、语音数据清洗"
+        }
+      ]
+    },
+    {
+      "skill_code": "annot.text",
+      "name_zh": "文本数据标注",
+      "name_en": "Text Data Annotation",
+      "category": "annotation",
+      "description": "按标注规范对文本数据进行标注。",
+      "aliases": [
+        "文本标注",
+        "Text Annotation"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#10",
+          "page": "6",
+          "section": "2.1 原始",
+          "quote": "能根据标注规范和要求, 完成文本、视觉、语音数据标注"
+        }
+      ]
+    },
+    {
+      "skill_code": "annot.image",
+      "name_zh": "视觉数据标注",
+      "name_en": "Image Data Annotation",
+      "category": "annotation",
+      "description": "按标注规范对图像数据进行标注。",
+      "aliases": [
+        "图像标注",
+        "Image Annotation"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#10",
+          "page": "6",
+          "section": "2.1 原始",
+          "quote": "能根据标注规范和要求, 完成文本、视觉、语音数据标注"
+        }
+      ]
+    },
+    {
+      "skill_code": "annot.audio",
+      "name_zh": "语音数据标注",
+      "name_en": "Audio Data Annotation",
+      "category": "annotation",
+      "description": "按标注规范对语音数据进行标注。",
+      "aliases": [
+        "语音标注",
+        "Audio Annotation"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#10",
+          "page": "6",
+          "section": "2.1 原始",
+          "quote": "能根据标注规范和要求, 完成文本、视觉、语音数据标注"
+        }
+      ]
+    },
+    {
+      "skill_code": "data.classification",
+      "name_zh": "标注数据分类",
+      "name_en": "Annotated Data Classification",
+      "category": "data",
+      "description": "使用分类工具对标注后的数据进行分类。",
+      "aliases": [
+        "数据分类",
+        "Data Classification",
+        "数据归类",
+        "Data Categorization",
+        "Classification"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#10",
+          "page": "6",
+          "section": "2.2 标注",
+          "quote": "能利用分类工具对标注后数据进行分类"
+        },
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#11",
+          "page": "6",
+          "section": "2.2 标注",
+          "quote": "2.2.1 数据分类工具使用知识"
+        },
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#12",
+          "page": "8",
+          "section": "2.1 数据",
+          "quote": "能根据数据内在关联和特征进行数据归类"
+        }
+      ]
+    },
+    {
+      "skill_code": "annot.general",
+      "name_zh": "通用数据标注",
+      "name_en": "General Data Annotation",
+      "category": "annotation",
+      "description": "按照标注规范完成文本、视觉、语音等业务数据的标注任务。",
+      "aliases": [
+        "数据标注",
+        "数据标注工作",
+        "标注任务",
+        "图文标注",
+        "多模态数据标注",
+        "数据批注",
+        "基础标注",
+        "标注",
+        "批注"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#10",
+          "page": "6",
+          "section": "2.1 原始",
+          "quote": "能根据标注规范和要求, 完成文本、视觉、语音数据标注"
+        }
+      ]
+    },
+    {
+      "skill_code": "data.statistics",
+      "name_zh": "标注数据统计",
+      "name_en": "Annotated Data Statistics",
+      "category": "data",
+      "description": "使用统计工具对标注后的数据进行统计。",
+      "aliases": [
+        "数据统计",
+        "Data Statistics",
+        "统计分析",
+        "Statistical Analysis",
+        "业务数据汇总",
+        "数据汇总",
+        "Data Summarization"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#10",
+          "page": "6",
+          "section": "2.2 标注",
+          "quote": "能利用统计工具对标注后数据进行统计"
+        },
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#11",
+          "page": "6",
+          "section": "2.2 标注",
+          "quote": "2.2.2 数据统计工具使用知识"
+        },
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#10",
+          "page": "6",
+          "section": "1.2 业务",
+          "quote": "能根据数据处理要求完成业务数据汇总"
+        }
+      ]
+    },
+    {
+      "skill_code": "tool.ai_system_operation",
+      "name_zh": "智能系统操作",
+      "name_en": "AI System Operation",
+      "category": "tool",
+      "description": "开启和基本使用智能系统。",
+      "aliases": [
+        "系统操作",
+        "System Operation"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#11",
+          "page": "6",
+          "section": "3.1 智能",
+          "quote": "3.1.1 能开启智能系统\n3.1.2 能简单使用智能系统"
+        }
+      ]
+    },
+    {
+      "skill_code": "quality.data_specification",
+      "name_zh": "业务数据规范梳理",
+      "name_en": "Business Data Specification",
+      "category": "quality",
+      "description": "根据AI技术要求梳理业务数据采集和处理规范。",
+      "aliases": [
+        "数据规范",
+        "Data Standard"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#11",
+          "page": "6",
+          "section": "1.1 业务",
+          "quote": "1.1.2 能结合人工智能技术要求梳理业务数据采集规范\n1.1.3 能结合人工智能技术要求梳理业务数据处理规范"
+        }
+      ]
+    },
+    {
+      "skill_code": "data.optimization",
+      "name_zh": "业务流程数据优化",
+      "name_en": "Business Process Data Optimization",
+      "category": "data",
+      "description": "对业务数据处理流程提出优化建议",
+      "aliases": [
+        "数据处理流程优化",
+        "Process Optimization",
+        "流程优化",
+        "Process Improvement"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#12",
+          "page": "8",
+          "section": "1.2 数据",
+          "quote": "能对业务数据处理流程提出优化建议"
+        },
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#11",
+          "page": "6",
+          "section": "1.2 数据",
+          "quote": "1.2.1 能对业务数据采集流程提出优化建议\n1.2.2 能对业务数据处理流程提出优化建议"
+        }
+      ]
+    },
+    {
+      "skill_code": "data.analysis",
+      "name_zh": "数据关联分析",
+      "name_en": "Data Correlation Analysis",
+      "category": "data",
+      "description": "运用工具分析杂乱数据的内在关联及特征",
+      "aliases": [
+        "数据分析",
+        "Data Analysis"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#12",
+          "page": "8",
+          "section": "2.1 数据",
+          "quote": "能运用工具 , 对杂乱数据进行分析, 输出内在关联及特征"
+        }
+      ]
+    },
+    {
+      "skill_code": "data.definition",
+      "name_zh": "数据定义",
+      "name_en": "Data Definition",
+      "category": "data",
+      "description": "根据数据内在关联和特征进行数据定义",
+      "aliases": [
+        "数据标注定义",
+        "Definition"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#12",
+          "page": "8",
+          "section": "2.1 数据",
+          "quote": "能根据数据内在关联和特征进行数据定义"
+        }
+      ]
+    },
+    {
+      "skill_code": "quality.audit",
+      "name_zh": "标注数据审核",
+      "name_en": "Annotation Data Audit",
+      "category": "quality",
+      "description": "完成标注数据准确性和完整性审核并输出报告",
+      "aliases": [
+        "数据审核",
+        "Data Audit",
+        "业务数据审核",
+        "Data Review",
+        "内容审核",
+        "标注质检",
+        "质量审核",
+        "审核能力"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#12",
+          "page": "8",
+          "section": "2.2 标注",
+          "quote": "能完成标注数据准确性和完整性审核, 输出审核报告"
+        },
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#11",
+          "page": "6",
+          "section": "1.1 业务",
+          "quote": "1.1.1 能对预处理后的业务数据进行审核"
+        }
+      ]
+    },
+    {
+      "skill_code": "quality.correction",
+      "name_zh": "标注错误纠正",
+      "name_en": "Annotation Error Correction",
+      "category": "quality",
+      "description": "对审核过程中发现的标注错误进行纠正",
+      "aliases": [
+        "错误纠正",
+        "Error Correction"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#12",
+          "page": "8",
+          "section": "2.2 标注",
+          "quote": "能对审核过程中发现的错误进行纠正"
+        }
+      ]
+    },
+    {
+      "skill_code": "data.filtering",
+      "name_zh": "数据筛选",
+      "name_en": "Data Filtering",
+      "category": "data",
+      "description": "根据审核结果完成数据筛选",
+      "aliases": [
+        "数据过滤",
+        "Filtering"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#12",
+          "page": "8",
+          "section": "2.2 标注",
+          "quote": "能根据审核结果完成数据筛选"
+        }
+      ]
+    },
+    {
+      "skill_code": "data.knowledge_maintenance",
+      "name_zh": "知识库维护",
+      "name_en": "Knowledge Base Maintenance",
+      "category": "data",
+      "description": "维护智能系统所需知识库",
+      "aliases": [
+        "知识维护",
+        "Knowledge Maintenance"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#12",
+          "page": "8",
+          "section": "3.1 智能",
+          "quote": "能维护智能系统所需知识库"
+        }
+      ]
+    },
+    {
+      "skill_code": "data.maintenance",
+      "name_zh": "系统数据维护",
+      "name_en": "System Data Maintenance",
+      "category": "data",
+      "description": "维护智能系统所需数据",
+      "aliases": [
+        "数据维护",
+        "Data Maintenance"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#12",
+          "page": "8",
+          "section": "3.1 智能",
+          "quote": "能维护智能系统所需数据"
+        }
+      ]
+    },
+    {
+      "skill_code": "data.scenario_analysis",
+      "name_zh": "智能产品场景适配",
+      "name_en": "AI Product Scenario Adaptation",
+      "category": "data",
+      "description": "为单一智能产品找到合适的应用场景",
+      "aliases": [
+        "场景分析",
+        "Scenario Analysis"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#12",
+          "page": "8",
+          "section": "3.1 智能",
+          "quote": "能为单一智能产品找到合适的应用场景"
+        }
+      ]
+    },
+    {
+      "skill_code": "data.system_deployment",
+      "name_zh": "智能系统部署",
+      "name_en": "AI System Deployment",
+      "category": "data",
+      "description": "将智能系统在真实应用场景中部署实施",
+      "aliases": [
+        "系统部署",
+        "System Deployment"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#12",
+          "page": "8",
+          "section": "3.1 智能",
+          "quote": "能将智能系统在真实应用场景中部署实施"
+        }
+      ]
+    },
+    {
+      "skill_code": "soft.ethics",
+      "name_zh": "职业道德",
+      "name_en": "Professional Ethics",
+      "category": "soft",
+      "description": "遵守职业行为准则和道德规范",
+      "aliases": [
+        "职业操守",
+        "Professional Ethics"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#9",
+          "page": "4",
+          "section": "2.1 职业道德",
+          "quote": "诚实公正, 严谨求是。\n(2) 遵纪守法, 恪尽职守。\n(3) 勤勉好学, 追求卓越。"
+        }
+      ]
+    },
+    {
+      "skill_code": "quality.compliance",
+      "name_zh": "法律法规知识",
+      "name_en": "Labor Law Knowledge",
+      "category": "quality",
+      "description": "了解劳动法、劳动合同法、网络安全法、知识产权法等与数据标注作业相关的法律法规要求。",
+      "aliases": [
+        "劳动合同法",
+        "Labor Law",
+        "知识产权法知识",
+        "知识产权",
+        "IP Law",
+        "网络安全法知识",
+        "网络安全",
+        "Cybersecurity Law"
+      ],
+      "provenance": "llm_drafted",
+      "sources": [
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#9",
+          "page": "4",
+          "section": "2.2 基础知识",
+          "quote": "《中华人民共和国劳动法》相关知识。\n(2)《中华人民共和国劳动合同法》相关知识。"
+        },
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#9",
+          "page": "4",
+          "section": "2.2 基础知识",
+          "quote": "《中华人民共和国知识产权法》相关知识。"
+        },
+        {
+          "chunk_id": "doc_ai_trainer_std_2021#9",
+          "page": "4",
+          "section": "2.2 基础知识",
+          "quote": "《中华人民共和国网络安全法》相关知识。"
+        }
+      ]
+    }
+  ]
+}

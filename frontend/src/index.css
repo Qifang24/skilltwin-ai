@@ -1,0 +1,179 @@
+/* Ant Design 的样式重置 */
+@import 'antd/dist/reset.css';
+
+:root {
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #172033;
+  background: #f4f7fb;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(22, 119, 255, 0.08), transparent 28rem),
+    #f4f7fb;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  text-decoration: none;
+}
+
+code {
+  font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  font-size: 0.9em;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.app-layout {
+  min-height: 100vh;
+  background: transparent;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  height: 64px;
+  padding-inline: clamp(20px, 5vw, 72px);
+  background: linear-gradient(100deg, #061a35 0%, #0a315e 52%, #115ba7 100%);
+  box-shadow: 0 2px 14px rgba(6, 26, 53, 0.18);
+}
+
+.app-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 180px;
+  color: #fff;
+  line-height: 1.1;
+}
+
+.app-brand:hover { color: #fff; }
+
+.app-brand__mark {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.app-brand strong,
+.app-brand small { display: block; }
+.app-brand small { margin-top: 3px; color: rgba(255, 255, 255, 0.65); font-size: 11px; }
+
+.app-navigation {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+}
+
+.app-content { padding: 32px clamp(20px, 5vw, 72px) 44px; }
+.app-shell { max-width: 1240px; margin: 0 auto; }
+.app-footer { padding: 20px; text-align: center; background: transparent; }
+
+.page-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: clamp(24px, 4vw, 40px);
+  overflow: hidden;
+  border: 1px solid rgba(44, 116, 195, 0.16);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(63, 169, 245, 0.24), transparent 19rem),
+    linear-gradient(120deg, #08244b, #0e4c8e);
+  color: #fff;
+  box-shadow: 0 14px 34px rgba(17, 65, 119, 0.18);
+}
+
+.page-hero__content { max-width: 760px; }
+.page-hero__eyebrow { margin: 0 0 12px; border: 0; color: #0b4380; background: #e4f2ff; font-weight: 600; }
+.page-hero__title.ant-typography { margin: 0 0 8px; color: #fff; }
+.page-hero__description.ant-typography { max-width: 720px; margin: 0; color: rgba(255, 255, 255, 0.78); font-size: 15px; }
+.page-hero__meta { margin-top: 18px; }
+.page-hero__actions { flex-shrink: 0; }
+
+.landing-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
+  gap: 36px;
+  align-items: center;
+  padding: clamp(30px, 6vw, 64px);
+  overflow: hidden;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 92% 14%, rgba(122, 204, 255, 0.42), transparent 20rem),
+    linear-gradient(120deg, #061a35, #0d4079 72%, #1167b4);
+  box-shadow: 0 16px 40px rgba(16, 55, 101, 0.2);
+}
+
+.landing-hero__eyebrow { color: #a9dcff; font-size: 13px; font-weight: 600; }
+.landing-hero__title.ant-typography { margin: 14px 0; color: #fff; font-size: clamp(32px, 4vw, 52px); line-height: 1.2; }
+.landing-hero__title span { color: #8ed4ff; }
+.landing-hero__description.ant-typography { max-width: 600px; color: rgba(255, 255, 255, 0.78); font-size: 16px; }
+
+.learning-loop { display: grid; gap: 10px; align-items: center; }
+.learning-loop__item {
+  padding: 14px 16px;
+  border: 1px solid rgba(211, 240, 255, 0.24);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-weight: 600;
+  backdrop-filter: blur(5px);
+}
+.learning-loop__item span { display: inline-block; width: 28px; color: #9edbff; font-size: 12px; }
+.learning-loop__item--accent { border-color: rgba(154, 235, 209, 0.56); background: rgba(27, 165, 144, 0.24); }
+.learning-loop__arrow { margin-left: 18px; color: #8ed4ff; font-size: 19px; line-height: 1; }
+
+.portal-card,
+.workflow-card,
+.selection-card { border-color: #e4ebf4; box-shadow: 0 8px 22px rgba(18, 50, 84, 0.05); }
+.portal-card { height: 100%; }
+.portal-card:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(18, 70, 121, 0.12); }
+.portal-card__symbol {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 6px;
+  background: #e6f4ff;
+  color: #1677ff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.feature-list .ant-tag { min-width: 48px; text-align: center; }
+
+.workflow-step { height: 100%; border-color: #e7eef7; background: linear-gradient(145deg, #fff, #f7fbff); }
+.workflow-step .ant-typography { margin: 12px 0 6px; }
+.workflow-step .ant-typography.ant-typography-secondary { min-height: 44px; margin: 0 0 6px; font-size: 13px; }
+.workflow-step .ant-btn-link { padding-inline: 0; }
+
+.selection-card { border-left: 4px solid #1677ff; }
+
+@media (max-width: 768px) {
+  .app-header { gap: 12px; padding-inline: 16px; }
+  .app-brand { min-width: auto; }
+  .app-brand small { display: none; }
+  .app-navigation { font-size: 13px; }
+  .app-content { padding: 20px 16px 32px; }
+  .page-hero { align-items: flex-start; flex-direction: column; }
+  .landing-hero { grid-template-columns: 1fr; gap: 26px; }
+}

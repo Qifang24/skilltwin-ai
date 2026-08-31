@@ -1,0 +1,36 @@
+{
+  "_comment": "TEMPLATE ONLY — 请复制为 data/seed/curriculum_<school>_<year>.json 后填写。所有 evidence/source_quote 必须逐字来自已入库的校本方案知识块；不要把本模板直接导入。",
+  "plan": {
+    "id": "replace_with_school_ai_2026",
+    "name": "替换为学校与培养方案全名",
+    "profession": "人工智能技术应用",
+    "version": "2026级",
+    "source_doc_id": "replace_with_ingested_knowledge_doc_id",
+    "source_name": "替换为原始文件的正式名称",
+    "source_url": null,
+    "license_note": "校内授权材料；仅用于本项目课程覆盖分析。",
+    "is_partial": true
+  },
+  "courses": [
+    {
+      "id": "replace_with_stable_course_id",
+      "name": "替换为课程名称",
+      "course_code": null,
+      "category": "专业核心课程",
+      "total_hours": 0,
+      "source_chunk_id": "replace_with_doc_id_chunk_index",
+      "source_page": null,
+      "source_quote": "替换为该知识块内可定位到课程名称、学时或课程说明的原文"
+    }
+  ],
+  "coverage": [
+    {
+      "course_id": "replace_with_stable_course_id",
+      "skill_code": "replace_with_existing_skill_code",
+      "coverage_strength": 1,
+      "source_chunk_id": "replace_with_doc_id_chunk_index",
+      "source_page": null,
+      "evidence_quote": "替换为该知识块内明确涉及本技能的原文"
+    }
+  ]
+}

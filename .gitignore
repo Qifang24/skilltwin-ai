@@ -1,0 +1,56 @@
+# ==================== 机密 ====================
+# 绝不允许提交任何真实 Key
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+
+# ==================== Python ====================
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ==================== 运行期数据 ====================
+# SQLite 库与向量库属于运行产物，用 scripts/ 重建，不进版本库
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/chroma/
+data/raw/
+data/cache/
+data/review/
+*.bm25.pkl
+data/bm25_knowledge.pkl
+
+# 采集到的原始资料体积大且可能含版权内容，只提交整理后的带来源条目
+knowledge/**/*.pdf
+knowledge/**/*.docx
+knowledge/**/*.doc
+
+# ==================== 前端 ====================
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.local
+phase16-*.png
+backups/
+
+# ==================== 模型缓存 ====================
+.cache/
+models/
+
+# ==================== 编辑器 / 系统 ====================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp

@@ -1,0 +1,73 @@
+{
+  "_comment": [
+    "人工策展覆盖表。extract_skills.py 在合并阶段按 rules 的**书写顺序**依次应用。",
+    "",
+    "存在意义：模型逐块抽取时看不到其他块，必然产生跨块近义重复。",
+    "与其悄悄手改生成结果（那样无法区分哪些是模型产出、哪些是人改的），",
+    "不如把每一条策展决定显式写在这里，可审计、可回溯、可推翻。",
+    "",
+    "规则类型：",
+    "  rename  —— 改 skill_code / 名称 / 类别，用于纠正模型的命名或归类错误",
+    "  merge   —— 把 from 合并进 into；from 的名称与别名并入 into 的 aliases，",
+    "             来源引用全部保留（策展是为了消重，不是为了丢证据）",
+    "  exclude —— 排除某技能，必须写明理由",
+    "",
+    "顺序有意义：先 rename 腾出编码，再 merge，最后 rename 定名。",
+    "",
+    "本文件由 AI 助手起草，尚未经职业教育教师审核。"
+  ],
+  "rules": [
+    {
+      "type": "rename",
+      "from": "quality.compliance",
+      "to": "soft.ethics",
+      "category": "soft",
+      "name_zh": "职业道德",
+      "reason": "模型把『职业道德』编码为 quality.compliance，但职业道德属非技术的职业素养，应归 soft。腾出 quality.compliance 供法律法规知识使用。"
+    },
+    {
+      "type": "merge",
+      "from": "quality.ip_law",
+      "into": "quality.labor_law",
+      "reason": "国标 2.2.2『相关法律、法规知识』是一个知识条目，下辖劳动法/劳动合同法/网络安全法/知识产权法四项，按标准自身结构应为一条能力。"
+    },
+    {
+      "type": "merge",
+      "from": "quality.cybersecurity_law",
+      "into": "quality.labor_law",
+      "reason": "同上，归入国标 2.2.2 相关法律、法规知识。"
+    },
+    {
+      "type": "rename",
+      "from": "quality.labor_law",
+      "to": "quality.compliance",
+      "category": "quality",
+      "name_zh": "法律法规知识",
+      "description": "了解劳动法、劳动合同法、网络安全法、知识产权法等与数据标注作业相关的法律法规要求。",
+      "reason": "合并后该条已涵盖四部法律，用 labor_law 命名以偏概全，改为 compliance。"
+    },
+    {
+      "type": "merge",
+      "from": "quality.data_audit",
+      "into": "quality.audit",
+      "reason": "两者均指标注数据的准确性与完整性审核，属国标 2.2『标注数据审核』下的同一能力，拆成两条会让 Gap 分析重复计分。"
+    },
+    {
+      "type": "merge",
+      "from": "data.process_optimization",
+      "into": "data.optimization",
+      "reason": "国标 1.2『数据处理方法优化』为单一工作内容，采集流程与处理流程的优化建议属同一能力。"
+    },
+    {
+      "type": "merge",
+      "from": "data.summarization",
+      "into": "data.statistics",
+      "reason": "国标 1.2『业务数据处理』中的『汇总』与『统计』在标注场景下为同一操作能力。"
+    },
+    {
+      "type": "exclude",
+      "skill_code": "soft.calculation",
+      "reason": "源自国标 1.6『职业能力特征』对计算能力的一般性描述，属任职者素质要求而非可教可测的岗位技能。纳入能力向量会产生无法命题的维度。"
+    }
+  ]
+}

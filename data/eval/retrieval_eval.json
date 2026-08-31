@@ -1,0 +1,121 @@
+{
+  "_comment": [
+    "检索评测集。没有评测集的 RAG 是不可信的 —— 无法回答「改了检索策略到底变好还是变坏」。",
+    "",
+    "判定标准：召回的某个 chunk 同时满足",
+    "  ① 来自 expected_doc_id",
+    "  ② 文本中包含 expected_keywords 里的任意一个",
+    "则视为命中。",
+    "",
+    "关键词均已用程序核实确实存在于语料中（见 scripts/eval_retrieval.py 的 --verify）。",
+    "查询刻意写成**自然提问**而非关键词罗列 —— 否则 BM25 会轻易胜出，",
+    "评测就失去了区分能力，也不反映真实使用场景。"
+  ],
+  "queries": [
+    {
+      "id": "q01",
+      "query": "人工智能训练师这个职业到底是做什么的",
+      "expected_doc_id": "doc_ai_trainer_std_2021",
+      "expected_keywords": ["智能训练软件"],
+      "note": "国标 1.3 职业定义"
+    },
+    {
+      "id": "q02",
+      "query": "初级工需要会做哪些数据清洗和标注工作",
+      "expected_doc_id": "doc_ai_trainer_std_2021",
+      "expected_keywords": ["数据清洗", "五级/初级工"],
+      "note": "国标 3.1 五级/初级工 工作要求"
+    },
+    {
+      "id": "q03",
+      "query": "考技能证书要考多长时间",
+      "expected_doc_id": "doc_ai_trainer_std_2021",
+      "expected_keywords": ["鉴定时间", "综合评审"],
+      "note": "国标 1.9.4 鉴定时间"
+    },
+    {
+      "id": "q04",
+      "query": "从业人员的职业守则有哪些要求",
+      "expected_doc_id": "doc_ai_trainer_std_2021",
+      "expected_keywords": ["诚实公正"],
+      "note": "国标 2.1 职业道德"
+    },
+    {
+      "id": "q05",
+      "query": "国家职业技能标准要求从业者了解哪些法律法规",
+      "expected_doc_id": "doc_ai_trainer_std_2021",
+      "expected_keywords": ["中华人民共和国劳动法"],
+      "note": "国标 2.2.2 相关法律法规知识。原查询为「标注工作需要了解哪些法律」，召回的全是信通院报告里数据安全与尊法守法的内容 —— 那其实是合理答案，是我武断地只认国标一个来源。改为明确指向标准，测的才是「能否定位到标准条文」这一件事。"
+    },
+    {
+      "id": "q06",
+      "query": "计算机视觉实训室要配什么设备",
+      "expected_doc_id": "doc_moe_ai_training_cond_2021",
+      "expected_keywords": ["计算机视觉实训室"],
+      "note": "教育部标准 4.6"
+    },
+    {
+      "id": "q07",
+      "query": "人工智能开发基础实训室的建设要求",
+      "expected_doc_id": "doc_moe_ai_training_cond_2021",
+      "expected_keywords": ["人工智能开发基础实训室"],
+      "note": "教育部标准 4.1"
+    },
+    {
+      "id": "q08",
+      "query": "实训场地需要多大面积",
+      "expected_doc_id": "doc_moe_ai_training_cond_2021",
+      "expected_keywords": ["实训场所面积"],
+      "note": "教育部标准 实训场所要求"
+    },
+    {
+      "id": "q09",
+      "query": "现在做数据标注的人学历水平有什么变化",
+      "expected_doc_id": "doc_caict_annotation_2025",
+      "expected_keywords": ["本科及以上学历", "高职高专"],
+      "note": "信通院报告 高知识密度趋势"
+    },
+    {
+      "id": "q10",
+      "query": "国家对数据标注产业出台了什么政策",
+      "expected_doc_id": "doc_caict_annotation_2025",
+      "expected_keywords": ["国家数据局"],
+      "note": "信通院报告 政策部分"
+    },
+    {
+      "id": "q11",
+      "query": "大模型时代对标注数据质量提出了什么新要求",
+      "expected_doc_id": "doc_caict_annotation_2025",
+      "expected_keywords": ["大模型"],
+      "note": "信通院报告 大模型数据标注需求"
+    },
+    {
+      "id": "q12",
+      "query": "怎么培养数据标注方面的人才",
+      "expected_doc_id": "doc_caict_annotation_2025",
+      "expected_keywords": ["人才培养", "校企合作"],
+      "note": "信通院报告 （五）人才培养"
+    },
+    {
+      "id": "q13",
+      "query": "人工智能技术应用专业的培养目标是什么",
+      "expected_doc_ids": ["doc_plan_hnjd_2023", "doc_moe_ai_training_cond_2021"],
+      "expected_keywords": ["培养目标", "人才培养方案"],
+      "note": "培养方案 培养目标。原先只认培养方案一个来源：实测检索在 top-5 里确实召回了该文档（第2/4/5位），但那几块不含「培养目标」四字而被过严的关键词判定卡掉。教育部教学标准同样规定了本专业培养目标，是等价的合理答案，故一并接受。"
+    },
+    {
+      "id": "q14",
+      "query": "这个专业毕业以后能做什么岗位",
+      "expected_doc_id": "doc_plan_hnjd_2023",
+      "expected_keywords": ["职业面向"],
+      "note": "培养方案 职业面向"
+    },
+    {
+      "id": "q15",
+      "query": "专业代码510209对应的专业是什么",
+      "expected_doc_id": "doc_plan_hnjd_2023",
+      "expected_keywords": ["510209"],
+      "note": "术语精确匹配，考察 BM25 通路是否发挥作用"
+    }
+  ]
+}

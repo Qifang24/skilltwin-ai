@@ -1,0 +1,126 @@
+{
+  "_comment": "北京地区高职公开样例：仅结构化北京信息职业技术学院人工智能技术应用专业（510209）2025级三年制中与 AI 数据标注岗位有直接原文证据的课程。is_partial=true；未映射不能解释为该校没有覆盖。",
+  "plan": {
+    "id": "bitc_ai_2025_3year",
+    "name": "人工智能技术应用专业人才培养方案（2025级三年制）·已结构化课程节选",
+    "profession": "人工智能技术应用",
+    "version": "2025级三年制",
+    "source_doc_id": "doc_plan_bitc_ai_2025",
+    "source_name": "北京信息职业技术学院《人工智能学院人才培养方案》（2025年6月修订）",
+    "source_url": "https://www.bitc.edu.cn/info/1371/5831.htm",
+    "license_note": "北京信息职业技术学院信息公开栏目发布的公共材料。PDF 含多个专业与学制；本条仅使用人工智能技术应用专业（510209）三年制的已核验节选，不替代合作学校的校本方案。",
+    "is_partial": true
+  },
+  "courses": [
+    {
+      "id": "bitc2025_data_collection_preprocess",
+      "name": "数据采集与预处理",
+      "category": "专业核心课程",
+      "total_hours": 64,
+      "source_chunk_id": "doc_plan_bitc_ai_2025#42",
+      "source_page": "292",
+      "source_quote": "数据采集与预处理"
+    },
+    {
+      "id": "bitc2025_data_classification_annotation",
+      "name": "数据分类与标注技术",
+      "category": "专业拓展课程",
+      "total_hours": 64,
+      "source_chunk_id": "doc_plan_bitc_ai_2025#45",
+      "source_page": "292",
+      "source_quote": "数据分类与标注技术"
+    },
+    {
+      "id": "bitc2025_computer_vision",
+      "name": "计算机视觉应用开发",
+      "category": "专业核心课程",
+      "total_hours": 64,
+      "source_chunk_id": "doc_plan_bitc_ai_2025#40",
+      "source_page": "291",
+      "source_quote": "计算机视觉应用开发"
+    },
+    {
+      "id": "bitc2025_ai_1x_training",
+      "name": "人工智能技术应用1+X取证专周实训",
+      "category": "综合实践课程",
+      "total_hours": null,
+      "source_chunk_id": "doc_plan_bitc_ai_2025#51",
+      "source_page": "294",
+      "source_quote": "人工智能技术应用1+X取证专周实训"
+    }
+  ],
+  "coverage": [
+    {
+      "course_id": "bitc2025_data_collection_preprocess",
+      "skill_code": "data.collection",
+      "coverage_strength": 2,
+      "source_chunk_id": "doc_plan_bitc_ai_2025#42",
+      "source_page": "292",
+      "evidence_quote": "能够使用Python中的相关库实现数据的爬取、读取和整合"
+    },
+    {
+      "course_id": "bitc2025_data_collection_preprocess",
+      "skill_code": "data.cleaning",
+      "coverage_strength": 2,
+      "source_chunk_id": "doc_plan_bitc_ai_2025#42",
+      "source_page": "292",
+      "evidence_quote": "具备数据预处理的能力，包括数据清洗、缺失值处理、数据格式转换等基础操作"
+    },
+    {
+      "course_id": "bitc2025_data_collection_preprocess",
+      "skill_code": "data.organization",
+      "coverage_strength": 2,
+      "source_chunk_id": "doc_plan_bitc_ai_2025#42",
+      "source_page": "292",
+      "evidence_quote": "将不同来源的数据进行整合合并"
+    },
+    {
+      "course_id": "bitc2025_data_classification_annotation",
+      "skill_code": "annot.general",
+      "coverage_strength": 2,
+      "source_chunk_id": "doc_plan_bitc_ai_2025#46",
+      "source_page": "293",
+      "evidence_quote": "能够熟练运用Python相关库及专业标注工具（如Labelme等）实现数据的自动分类与高效人工/半自动标注"
+    },
+    {
+      "course_id": "bitc2025_data_classification_annotation",
+      "skill_code": "data.classification",
+      "coverage_strength": 2,
+      "source_chunk_id": "doc_plan_bitc_ai_2025#45",
+      "source_page": "292",
+      "evidence_quote": "掌握数据分类与标注的核心原理、常用方法与技术规范"
+    },
+    {
+      "course_id": "bitc2025_data_classification_annotation",
+      "skill_code": "quality.audit",
+      "coverage_strength": 2,
+      "source_chunk_id": "doc_plan_bitc_ai_2025#46",
+      "source_page": "293",
+      "evidence_quote": "具备数据清洗、标注质量检验与结果优化的能力"
+    },
+    {
+      "course_id": "bitc2025_computer_vision",
+      "skill_code": "annot.image",
+      "coverage_strength": 2,
+      "source_chunk_id": "doc_plan_bitc_ai_2025#41",
+      "source_page": "292",
+      "evidence_quote": "检测并标注图像位置等信息"
+    },
+    {
+      "course_id": "bitc2025_ai_1x_training",
+      "skill_code": "data.collection",
+      "coverage_strength": 2,
+      "source_chunk_id": "doc_plan_bitc_ai_2025#51",
+      "source_page": "294",
+      "evidence_quote": "掌握图像采集、整理、清洗、增广、可视化检测及视觉应用部署等知识"
+    },
+    {
+      "course_id": "bitc2025_ai_1x_training",
+      "skill_code": "data.cleaning",
+      "coverage_strength": 2,
+      "source_chunk_id": "doc_plan_bitc_ai_2025#51",
+      "source_page": "294",
+      "evidence_quote": "掌握图像采集、整理、清洗、增广、可视化检测及视觉应用部署等知识"
+    }
+  ]
+}

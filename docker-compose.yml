@@ -1,0 +1,44 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/backend.Dockerfile
+    env_file:
+      - .env
+    environment:
+      PYTHONUNBUFFERED: "1"
+      # A container is normally CPU-only; set cuda only when the host runtime exposes a GPU.
+      EMBEDDING_DEVICE: ${EMBEDDING_DEVICE:-cpu}
+      BOOTSTRAP_ON_START: ${BOOTSTRAP_ON_START:-true}
+      BUILD_RAG_INDEX_ON_START: ${BUILD_RAG_INDEX_ON_START:-true}
+    volumes:
+      - skilltwin_data:/app/data
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=5).read()"]
+      interval: 15s
+      timeout: 8s
+      retries: 12
+      start_period: 180s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/frontend.Dockerfile
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${SKILLTWIN_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  skilltwin_data:
+    name: skilltwin_data

@@ -1,0 +1,34 @@
+{
+  "_comment": "真实公开方案的已核验节选；is_partial=true，未列课程不得被解释为没有覆盖。",
+  "plan": {
+    "id": "hnjd_ai_2023",
+    "name": "人工智能技术应用专业人才培养方案（2023级）·已结构化课程节选",
+    "profession": "人工智能技术应用",
+    "version": "2023级",
+    "source_doc_id": "doc_plan_hnjd_2023",
+    "source_name": "河南机电职业学院《人工智能技术应用专业人才培养方案（2023级）》",
+    "source_url": "https://www.hnjdzy.edu.cn/xinxigc/upload/files/2024/3/f8c73f582d1a38.pdf",
+    "license_note": "院校官网公开发布；仅作为单一院校样例，不代表全国普遍情况。",
+    "is_partial": true
+  },
+  "courses": [
+    {"id": "hnjd2023_python", "name": "Python程序设计", "category": "专业基础课程", "total_hours": 64, "source_chunk_id": "doc_plan_hnjd_2023#42", "source_page": "28", "source_quote": "05 课程名称：Python程序设计学时：64"},
+    {"id": "hnjd2023_data_analysis", "name": "数据分析与处理", "category": "专业核心课程", "total_hours": 64, "source_chunk_id": "doc_plan_hnjd_2023#46", "source_page": "31", "source_quote": "02 课程名称：数据分析与处理学时：64"},
+    {"id": "hnjd2023_machine_learning", "name": "机器学习基础及应用", "category": "专业核心课程", "total_hours": 80, "source_chunk_id": "doc_plan_hnjd_2023#47", "source_page": "31", "source_quote": "03 课程名称：机器学习基础及应用学时：80"},
+    {"id": "hnjd2023_deep_learning", "name": "深度学习及应用", "category": "专业核心课程", "total_hours": 80, "source_chunk_id": "doc_plan_hnjd_2023#50", "source_page": "33", "source_quote": "05 课程名称：深度学习及应用学时：80"},
+    {"id": "hnjd2023_practice", "name": "技能综合实训", "category": "专业集中实践课程", "total_hours": 144, "source_chunk_id": "doc_plan_hnjd_2023#53", "source_page": "35", "source_quote": "01 课程名称：技能综合实训学时：144"},
+    {"id": "hnjd2023_crawler", "name": "Python网络爬虫技术", "category": "专业拓展选修课程", "total_hours": 24, "source_chunk_id": "doc_plan_hnjd_2023#59", "source_page": "40", "source_quote": "能运用Python模块进行网络数据采集和解析"}
+  ],
+  "coverage": [
+    {"course_id": "hnjd2023_python", "skill_code": "soft.learning", "coverage_strength": 1, "source_chunk_id": "doc_plan_hnjd_2023#42", "source_page": "28", "evidence_quote": "具备一定的自学能力"},
+    {"course_id": "hnjd2023_data_analysis", "skill_code": "data.collection", "coverage_strength": 1, "source_chunk_id": "doc_plan_hnjd_2023#46", "source_page": "31", "evidence_quote": "数据采集"},
+    {"course_id": "hnjd2023_data_analysis", "skill_code": "annot.general", "coverage_strength": 1, "source_chunk_id": "doc_plan_hnjd_2023#46", "source_page": "31", "evidence_quote": "数据分析与处理基础知识，包含数据采集、数据标注、数据清洗等"},
+    {"course_id": "hnjd2023_data_analysis", "skill_code": "data.cleaning", "coverage_strength": 1, "source_chunk_id": "doc_plan_hnjd_2023#46", "source_page": "31", "evidence_quote": "数据清洗"},
+    {"course_id": "hnjd2023_data_analysis", "skill_code": "data.analysis", "coverage_strength": 2, "source_chunk_id": "doc_plan_hnjd_2023#46", "source_page": "31", "evidence_quote": "能运用数据分析和处理知识，结合Python开展创新设计和综合应用"},
+    {"course_id": "hnjd2023_machine_learning", "skill_code": "data.cleaning", "coverage_strength": 1, "source_chunk_id": "doc_plan_hnjd_2023#47", "source_page": "31", "evidence_quote": "能运用TensorFlow完成数据加载、数据预处理、模型训练、模型预测过程"},
+    {"course_id": "hnjd2023_deep_learning", "skill_code": "data.collection", "coverage_strength": 1, "source_chunk_id": "doc_plan_hnjd_2023#51", "source_page": "34", "evidence_quote": "数据采集"},
+    {"course_id": "hnjd2023_deep_learning", "skill_code": "annot.general", "coverage_strength": 1, "source_chunk_id": "doc_plan_hnjd_2023#51", "source_page": "34", "evidence_quote": "数据采集、数据标注、数据预处理、模型构建、模型训练、模型评估和模型应用的技能"},
+    {"course_id": "hnjd2023_deep_learning", "skill_code": "data.cleaning", "coverage_strength": 1, "source_chunk_id": "doc_plan_hnjd_2023#51", "source_page": "34", "evidence_quote": "数据预处理"},
+    {"course_id": "hnjd2023_crawler", "skill_code": "data.collection", "coverage_strength": 2, "source_chunk_id": "doc_plan_hnjd_2023#59", "source_page": "40", "evidence_quote": "能运用Python模块进行网络数据采集和解析"}
+  ]
+}
