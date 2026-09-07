@@ -47,6 +47,9 @@ backups/
 # ==================== 模型缓存 ====================
 .cache/
 models/
+!backend/app/models/
+!backend/app/models/**
+backend/app/models/__pycache__/
 
 # ==================== 编辑器 / 系统 ====================
 .vscode/
