@@ -235,6 +235,20 @@ def test_approving_twice_is_rejected(seeded: Session) -> None:
         service.approve(result.graph.id, "李老师")
 
 
+def test_draft_can_be_deleted_but_approved_graph_cannot(seeded: Session) -> None:
+    service, result = _persist(seeded, _draft())
+    graph_id = result.graph.id
+    service.delete_draft(graph_id)
+    seeded.commit()
+    assert seeded.get(CompetencyGraph, graph_id) is None
+
+    _, approved = _persist(seeded, _draft())
+    service.approve(approved.graph.id, "张老师")
+    seeded.commit()
+    with pytest.raises(ConflictError):
+        service.delete_draft(approved.graph.id)
+
+
 def test_approve_archives_previous_version(seeded: Session) -> None:
     """同一岗位只保留一份 approved，否则下游不知道该引用哪份。"""
     service, first = _persist(seeded, _draft())

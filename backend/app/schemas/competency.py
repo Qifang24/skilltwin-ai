@@ -91,6 +91,7 @@ class NodeRead(BaseModel):
     node_type: NodeType
     name: str
     description: str | None = None
+    teacher_note: str | None = None
     skill_code: str | None = None
     mastery_level: int | None = None
     mastery_label: str | None = None
@@ -125,6 +126,7 @@ class GraphSummary(BaseModel):
     summary: str | None = None
     approved_by: str | None = None
     approved_at: datetime | None = None
+    selected_skill_codes: list[str] = Field(default_factory=list)
     created_at: datetime
     node_count: int = 0
     skill_point_count: int = 0
@@ -144,6 +146,8 @@ class GenerateGraphRequest(BaseModel):
     job_id: str = Field(min_length=1, max_length=64)
     #: 额外的侧重说明，例如「侧重图像标注方向」
     focus: str | None = Field(default=None, max_length=200)
+    #: 从岗位需求分析中明确纳入本次图谱的技能；为空时使用全部有效技能。
+    selected_skill_codes: list[str] = Field(default_factory=list, max_length=50)
 
 
 class ApproveGraphRequest(BaseModel):

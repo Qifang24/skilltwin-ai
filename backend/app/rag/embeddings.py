@@ -72,7 +72,22 @@ class LocalBGEProvider(EmbeddingProvider):
         try:
             import torch
 
-            return "cuda" if torch.cuda.is_available() else "cpu"
+            if not torch.cuda.is_available():
+                return "cpu"
+
+            # 新显卡可能被旧版 PyTorch 识别到，却没有对应的 CUDA kernel。
+            # 此时让 sentence-transformers 使用 CUDA 会在首次检索才失败；预先
+            # 回退到 CPU，保证图谱生成仍可使用向量检索。
+            capability = torch.cuda.get_device_capability(0)
+            device_arch = f"sm_{capability[0]}{capability[1]}"
+            supported_arches = set(torch.cuda.get_arch_list())
+            if device_arch not in supported_arches:
+                logger.warning(
+                    "当前 PyTorch 不支持该 CUDA 架构，embedding 将使用 CPU",
+                    extra={"device_arch": device_arch, "supported_arches": sorted(supported_arches)},
+                )
+                return "cpu"
+            return "cuda"
         except Exception:  # pragma: no cover - 取决于运行环境
             return "cpu"
 

@@ -4,10 +4,13 @@ import type { GraphStatus, MasteryLevel, NodeType, SourceRef } from '@/types/api
 
 /** 节点的依据引用，回答「这项能力凭什么在图谱里」 */
 export interface NodeEvidence {
+  type?: 'job_posting' | string
+  posting_id?: string | null
   chunk_id?: string | null
   page?: string | null
   section?: string | null
   source_name?: string | null
+  source_url?: string | null
   quote?: string | null
 }
 
@@ -17,6 +20,7 @@ export interface GraphNode {
   node_type: NodeType
   name: string
   description?: string | null
+  teacher_note?: string | null
   skill_code?: string | null
   mastery_level?: MasteryLevel | null
   mastery_label?: string | null
@@ -39,6 +43,7 @@ export interface GraphSummary {
   summary?: string | null
   approved_by?: string | null
   approved_at?: string | null
+  selected_skill_codes: string[]
   created_at: string
   node_count: number
   skill_point_count: number

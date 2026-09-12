@@ -13,6 +13,7 @@ import {
   Col,
   Empty,
   Input,
+  List,
   Modal,
   Row,
   Select,
@@ -37,6 +38,7 @@ import {
   fetchLatestLearningPath,
   fetchProfile,
   fetchStudents,
+  fetchTasks,
   generateLearningPath,
   startLearningPathRetest,
   startAssessment,
@@ -45,8 +47,9 @@ import {
 } from '@/services/api'
 import type { PathStatus } from '@/types/learning'
 import type { SkillGap } from '@/types/student'
+import { DIFFICULTY_COLORS, DIFFICULTY_LABELS, type TrainingTaskSummary } from '@/types/training'
 
-const { Paragraph, Text } = Typography
+const { Title, Paragraph, Text } = Typography
 
 const TARGET_JOB = 'ai_data_annotator'
 
@@ -58,8 +61,13 @@ export function StudentDashboard() {
   const studentId = searchParams.get('student')
   const [createOpen, setCreateOpen] = useState(false)
   const [newName, setNewName] = useState('')
+  const [diagnosticHint, setDiagnosticHint] = useState<string | null>(null)
 
   const studentsQuery = useQuery({ queryKey: ['students'], queryFn: fetchStudents })
+  const publishedTasksQuery = useQuery({
+    queryKey: ['student-published-tasks', TARGET_JOB],
+    queryFn: () => fetchTasks({ job_id: TARGET_JOB, status: 'published' }),
+  })
 
   const profileQuery = useQuery({
     queryKey: ['profile', studentId, TARGET_JOB],
@@ -98,7 +106,11 @@ export function StudentDashboard() {
   const startDiagnostic = useMutation({
     mutationFn: () => startAssessment(studentId!, TARGET_JOB, 16, 'diagnostic'),
     onSuccess: (assessment) => navigate(`/student/assessments/${assessment.id}`),
-    onError: (e) => message.error(toErrorMessage(e)),
+    onError: (e) => {
+      const detail = toErrorMessage(e)
+      setDiagnosticHint('暂时无法开始诊断。通常是教师尚未准备好题库，请联系教师确认后再试。')
+      message.error(detail)
+    },
   })
 
   const startRetest = useMutation({
@@ -190,49 +202,102 @@ export function StudentDashboard() {
     },
   ]
 
+  const scrollTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
   return (
-    <Space orientation="vertical" size={20} style={{ width: '100%' }}>
+    <Space className="student-workspace" orientation="vertical" size={14} style={{ width: '100%' }}>
       <PageHero
-        eyebrow="学生端 · 自适应学习"
-        title="看见能力差距，走出成长路径"
-        description="完成诊断后，系统对照已审核的岗位能力图谱生成能力画像、学习优先级与可执行的实训计划。"
-        meta={<Space wrap><Tag color="blue">目标岗位：AI 数据标注工程师</Tag><Tag color="cyan">画像会随测评与实训更新</Tag></Space>}
+        eyebrow="学生学习中心 · 个性化成长"
+        title="从能力诊断到个性化学习"
+        description="选择学习档案，完成能力诊断，按系统生成的学习路径练习与复测。"
+        meta={<Space wrap><Tag color="blue">目标岗位 · AI 数据标注工程师</Tag><Tag color="cyan">能力画像会随测评和实训更新</Tag></Space>}
       />
 
-      <Card size="small" className="selection-card">
-        <Space wrap size={12}>
-          <Text>当前学生：</Text>
-          <Select
-            style={{ minWidth: 220 }}
-            placeholder="选择一个学生（演示用，无需登录）"
-            value={studentId}
-            onChange={(value) => setSearchParams({ student: value })}
-            loading={studentsQuery.isLoading}
-            options={(studentsQuery.data ?? []).map((s) => ({
-              value: s.id,
-              label: `${s.display_name}（${s.id.slice(0, 12)}）`,
-            }))}
-          />
-          <Button onClick={() => setCreateOpen(true)}>新建学生</Button>
-          {studentId && (
-            <Button
-              type="primary"
-              loading={startDiagnostic.isPending}
-              onClick={() => startDiagnostic.mutate()}
-            >
-              开始能力诊断
-            </Button>
-          )}
-          {studentId && <Button onClick={() => navigate(`/student/tutor?student=${studentId}`)}>AI 学习助手</Button>}
-        </Space>
-        <Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
-          系统只存化名，不记录姓名、学号等个人信息，且支持彻底删除。
-        </Paragraph>
+      <Card className="student-workflow-card" title="三步开始个性化学习" extra={<Text type="secondary">诊断结果决定你的学习重点和练习顺序</Text>}>
+        <Row gutter={[12, 12]}>
+          <Col xs={24} md={8}>
+            <Card id="student-profile-selector" size="small" className="student-workflow-step student-workflow-step--01">
+              <span className="student-workflow-step__number">STEP 01</span>
+              <Title level={5}>选择学习档案</Title>
+              <Paragraph>选择已有化名，或新建一个学习档案。</Paragraph>
+              <div className="student-workflow-step__profile">
+                <Select
+                  placeholder="选择一个学生（演示用，无需登录）"
+                  value={studentId}
+                  onChange={(value) => {
+                    setDiagnosticHint(null)
+                    setSearchParams({ student: value })
+                  }}
+                  loading={studentsQuery.isLoading}
+                  options={(studentsQuery.data ?? []).map((s) => ({
+                    value: s.id,
+                    label: `${s.display_name}（${s.id.slice(0, 12)}）`,
+                  }))}
+                />
+                <Button onClick={() => setCreateOpen(true)}>新建学生</Button>
+              </div>
+              <Text className="student-workflow-step__hint">仅保存化名，不记录姓名、学号等个人信息。</Text>
+            </Card>
+          </Col>
+          <Col xs={24} md={8}>
+            <Card size="small" className="student-workflow-step student-workflow-step--02">
+              <span className="student-workflow-step__number">STEP 02</span>
+              <Title level={5}>完成能力诊断</Title>
+              <Paragraph>通过诊断题生成能力画像，查看与岗位要求的差距。</Paragraph>
+              <Button disabled={!studentId} loading={startDiagnostic.isPending} onClick={() => studentId ? startDiagnostic.mutate() : scrollTo('student-profile-selector')}>{studentId ? '开始能力诊断 →' : '先选择学习档案 →'}</Button>
+            </Card>
+          </Col>
+          <Col xs={24} md={8}>
+            <Card size="small" className="student-workflow-step student-workflow-step--03">
+              <span className="student-workflow-step__number">STEP 03</span>
+              <Title level={5}>按路径练习</Title>
+              <Paragraph>按优先顺序完成练习与实训，并在需要时参加复测。</Paragraph>
+              <Button disabled={!studentId} onClick={() => studentId ? scrollTo('student-learning-results') : scrollTo('student-profile-selector')}>{studentId ? '查看学习路径 →' : '先选择学习档案 →'}</Button>
+            </Card>
+          </Col>
+        </Row>
       </Card>
 
-      {!studentId && (
-        <Empty description="请先选择或新建一个学生" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-      )}
+      <Card
+        className="student-published-tasks-card"
+        title="已发布实训任务"
+        extra={<Text type="secondary">{publishedTasksQuery.data?.total ?? 0} 项任务可开始</Text>}
+      >
+        <List
+          loading={publishedTasksQuery.isLoading}
+          dataSource={publishedTasksQuery.data?.items ?? []}
+          locale={{ emptyText: '老师暂未发布实训任务' }}
+          renderItem={(task: TrainingTaskSummary) => (
+            <List.Item
+              actions={[
+                <Button
+                  key="start"
+                  type="primary"
+                  disabled={!studentId}
+                  onClick={() => studentId && navigate(`/student/tasks/${task.id}?student=${encodeURIComponent(studentId)}`)}
+                >
+                  {studentId ? '开始任务 →' : '先选择学习档案'}
+                </Button>,
+              ]}
+            >
+              <List.Item.Meta
+                title={<Text strong>{task.title}</Text>}
+                description={
+                  <Space size={8} wrap>
+                    <Tag color={DIFFICULTY_COLORS[task.difficulty]}>{DIFFICULTY_LABELS[task.difficulty]}</Tag>
+                    <Text type="secondary">{task.est_minutes ? `预计 ${task.est_minutes} 分钟` : '时长待定'}</Text>
+                    <Text type="secondary">训练 {task.skill_count} 项技能</Text>
+                  </Space>
+                }
+              />
+            </List.Item>
+          )}
+        />
+      </Card>
+
+      <div id="student-learning-results" />
 
       {studentId && (profileQuery.isLoading || gapQuery.isLoading) && (
         <Skeleton active paragraph={{ rows: 8 }} />
@@ -244,6 +309,15 @@ export function StudentDashboard() {
           showIcon
           title="尚无能力画像"
           description="该学生还没有完成诊断测评。点击上方「开始能力诊断」即可生成能力画像。"
+        />
+      )}
+
+      {studentId && diagnosticHint && (
+        <Alert
+          type="warning"
+          showIcon
+          title="诊断尚未准备好"
+          description={diagnosticHint}
         />
       )}
 
@@ -319,7 +393,7 @@ export function StudentDashboard() {
             </Col>
           </Row>
 
-          <Card title="能力差距明细" size="small">
+          <Card title="第 3 步：查看能力差距" size="small">
             <Table
               rowKey="skill_code"
               size="small"

@@ -37,6 +37,9 @@ import type {
 import type {
   JobMarketAnalyzeResponse,
   JobMarketDashboard,
+  JobEvidenceCandidate,
+  JobPostingImportPayload,
+  JobPostingImportResponse,
 } from '@/types/jobMarket'
 import type { CurriculumGapDashboard, CurriculumOptimization } from '@/types/curriculum'
 import type { TutorReply } from '@/types/tutor'
@@ -154,10 +157,11 @@ export async function fetchGraph(graphId: string) {
 }
 
 /** 生成图谱草案。耗时较长（含检索与模型生成），可达 1 分钟。 */
-export async function generateGraph(jobId: string, focus?: string) {
+export async function generateGraph(jobId: string, focus?: string, selectedSkillCodes?: string[]) {
   const { data } = await http.post<GraphDetail>(`${API_PREFIX}/graphs/generate`, {
     job_id: jobId,
     focus,
+    selected_skill_codes: selectedSkillCodes ?? [],
   })
   return data
 }
@@ -173,6 +177,7 @@ export async function approveGraph(graphId: string, approvedBy: string) {
 export interface NodeUpdatePayload {
   name?: string
   description?: string | null
+  teacher_note?: string | null
   skill_code?: string | null
   mastery_level?: number | null
 }
@@ -370,7 +375,15 @@ export async function startLearningPathRetest(
 
 export async function fetchJobMarketDashboard(
   jobId: string,
-  params?: { top_n?: number; trend_skill_code?: string[] },
+  params?: {
+    top_n?: number
+    trend_skill_code?: string[]
+    city?: string
+    source?: string
+    title?: string
+    posted_from?: string
+    posted_to?: string
+  },
 ) {
   const { data } = await http.get<JobMarketDashboard>(
     `${API_PREFIX}/job-market/${jobId}/dashboard`,
@@ -385,6 +398,45 @@ export async function analyzeJobMarket(jobId: string) {
     `${API_PREFIX}/job-market/${jobId}/analyze`,
   )
   return data
+}
+
+export async function refreshTaskCitations(taskId: string) {
+  const { data } = await http.post<TrainingTaskDetail>(
+    `${API_PREFIX}/training-tasks/${taskId}/refresh-citations`,
+  )
+  return data
+}
+
+export async function updateTask(taskId: string, payload: Record<string, unknown>) {
+  const { data } = await http.patch<TrainingTaskDetail>(
+    `${API_PREFIX}/training-tasks/${taskId}`,
+    payload,
+  )
+  return data
+}
+
+export async function fetchGraphNodeJobEvidenceCandidates(graphId: string, nodeId: string) {
+  const { data } = await http.get<JobEvidenceCandidate[]>(
+    `${API_PREFIX}/graphs/${graphId}/nodes/${nodeId}/job-evidence-candidates`,
+  )
+  return data
+}
+
+export async function linkGraphNodeJobEvidence(graphId: string, nodeId: string, postingIds: string[]) {
+  const { data } = await http.post<GraphNode>(
+    `${API_PREFIX}/graphs/${graphId}/nodes/${nodeId}/job-evidence`,
+    { posting_ids: postingIds },
+  )
+  return data
+}
+
+export async function importJobPostings(payload: JobPostingImportPayload) {
+  const { data } = await http.post<JobPostingImportResponse>(`${API_PREFIX}/job-market/import`, payload)
+  return data
+}
+
+export async function deleteGraph(graphId: string) {
+  await http.delete(`${API_PREFIX}/graphs/${graphId}`)
 }
 
 export async function fetchCurriculumGap(jobId: string) {

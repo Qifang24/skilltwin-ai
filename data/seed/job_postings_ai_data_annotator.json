@@ -11,6 +11,7 @@
     "exclusion_reason": "排除管理岗、高级算法研发岗与海外岗位，避免与第一阶段学生目标岗位混合统计。"
   },
   "job_id": "ai_data_annotator",
+  "job_name": "AI数据标注工程师",
   "postings": [
     {
       "id": "real_jd_001",

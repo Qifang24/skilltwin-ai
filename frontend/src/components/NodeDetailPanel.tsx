@@ -18,6 +18,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import { DeleteOutlined } from '@ant-design/icons'
 import { useEffect, useState } from 'react'
 
 import { useNavigate } from 'react-router-dom'
@@ -25,6 +26,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   deleteGraphNode,
   generateTask,
+  linkGraphNodeJobEvidence,
   toErrorMessage,
   updateGraphNode,
 } from '@/services/api'
@@ -62,6 +64,7 @@ export function NodeDetailPanel({
       form.setFieldsValue({
         name: node.name,
         description: node.description ?? '',
+        teacher_note: node.teacher_note ?? '',
         mastery_level: node.mastery_level ?? undefined,
       })
     }
@@ -83,6 +86,7 @@ export function NodeDetailPanel({
       await updateGraphNode(graphId, node.id, {
         name: values.name,
         description: values.description || null,
+        teacher_note: values.teacher_note || null,
         mastery_level: values.mastery_level ?? null,
       })
       message.success('已保存')
@@ -120,6 +124,20 @@ export function NodeDetailPanel({
     }
   }
 
+  const removeJobEvidence = async (postingId: string) => {
+    if (!node) return
+    const remaining = node.evidence
+      .filter((item) => item.type === 'job_posting' && item.posting_id && item.posting_id !== postingId)
+      .map((item) => item.posting_id as string)
+    try {
+      await linkGraphNodeJobEvidence(graphId, node.id, remaining)
+      message.success('已移除该岗位原文依据')
+      onChanged()
+    } catch (error) {
+      message.error(toErrorMessage(error))
+    }
+  }
+
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <Space size={8} wrap>
@@ -146,6 +164,9 @@ export function NodeDetailPanel({
           <Form.Item name="description" label="说明">
             <Input.TextArea rows={3} />
           </Form.Item>
+          <Form.Item name="teacher_note" label="教师备注">
+            <Input.TextArea rows={4} maxLength={2000} showCount placeholder="记录审核观察、教学提醒或后续调整想法" />
+          </Form.Item>
           {node.skill_code && (
             <Form.Item
               name="mastery_level"
@@ -170,6 +191,11 @@ export function NodeDetailPanel({
             {node.description && (
               <Descriptions.Item label="说明">{node.description}</Descriptions.Item>
             )}
+            {node.teacher_note && (
+              <Descriptions.Item label="教师备注">
+                <div className="node-teacher-note">{node.teacher_note}</div>
+              </Descriptions.Item>
+            )}
             {node.skill_code && (
               <Descriptions.Item label="技能编码">
                 <Text code>{node.skill_code}</Text>
@@ -188,9 +214,9 @@ export function NodeDetailPanel({
           </Descriptions>
 
           {editable && (
-            <Space>
+            <div className="node-detail-actions"><Space size={12}>
               <Button size="small" onClick={() => setEditing(true)}>
-                修改
+                修改/备注
               </Button>
               <Popconfirm
                 title="删除该节点"
@@ -204,7 +230,7 @@ export function NodeDetailPanel({
                   删除
                 </Button>
               </Popconfirm>
-            </Space>
+            </Space></div>
           )}
         </>
       )}
@@ -220,26 +246,30 @@ export function NodeDetailPanel({
         </Button>
       )}
 
-      <div>
+      <div className="node-evidence-section">
         <Text strong>依据</Text>
         {node.evidence.length === 0 ? (
-          <Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
-            该节点未标注依据来源，建议核实后再通过审核。
-          </Paragraph>
+          <div className="node-evidence-section__missing">
+            <Text strong>待补充依据</Text>
+            <Paragraph style={{ margin: '4px 0 0' }}>该节点尚未关联职业标准或岗位原文，请核实来源后再通过审核。</Paragraph>
+          </div>
         ) : (
           <Space direction="vertical" size={12} style={{ width: '100%', marginTop: 8 }}>
             {node.evidence.map((item, index) => (
               <div
+                className="node-evidence-section__item"
                 key={`${item.chunk_id}-${index}`}
                 style={{
                   borderLeft: '3px solid #1677ff',
                   paddingLeft: 12,
                   background: 'rgba(0,0,0,0.02)',
-                  padding: '8px 12px',
+                  padding: '8px 44px 8px 12px',
                   borderRadius: 4,
+                  position: 'relative',
                 }}
               >
                 <Text style={{ fontSize: 12 }} type="secondary">
+                  {item.type === 'job_posting' ? '岗位原文 · ' : '职业标准 · '}
                   {[
                     item.source_name,
                     item.section,
@@ -254,11 +284,25 @@ export function NodeDetailPanel({
                 >
                   {item.quote}
                 </Paragraph>
+                {item.source_url && <a href={item.source_url} target="_blank" rel="noreferrer">查看公开来源</a>}
+                {editable && item.type === 'job_posting' && item.posting_id && (
+                  <Popconfirm
+                    title="移除岗位原文依据"
+                    description="仅移除此条岗位原文关联。"
+                    okText="移除"
+                    cancelText="取消"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => removeJobEvidence(item.posting_id as string)}
+                  >
+                    <Button className="node-evidence-section__remove" type="text" danger icon={<DeleteOutlined />} aria-label="移除岗位原文依据" />
+                  </Popconfirm>
+                )}
               </div>
             ))}
           </Space>
         )}
       </div>
+
     </Space>
   )
 }

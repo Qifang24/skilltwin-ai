@@ -147,3 +147,58 @@ def test_job_market_analyze_api(market_context: Session, client) -> None:
     body = response.json()
     assert body["extracted_skill_links"] == 7
     assert body["dashboard"]["ranking"][0]["evidence"]
+
+
+def test_import_job_postings_validates_source_scrubs_pii_and_rebuilds_dashboard(
+    market_context: Session, client, db: Session
+) -> None:
+    response = client.post(
+        "/api/v1/job-market/import",
+        json={
+            "job_id": "ai_data_annotator",
+            "job_name": "AI 数据标注工程师",
+            "postings": [
+                {
+                    "id": "imported_public_jd_1",
+                    "title": "数据标注工程师",
+                    "raw_text": "岗位职责：使用 Python 完成数据清洗与图像标注，负责质量检查。联系 13800138000，工作认真细致并遵守数据规范。",
+                    "source_name": "公开招聘平台",
+                    "source_url": "https://example.com/imported_public_jd_1",
+                    "posted_at": "2026-09-10T00:00:00+08:00",
+                    "data_flag": "REAL",
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["created"] == 1
+    assert body["pii_scrubbed"] == 1
+    assert body["dashboard"]["data_quality"]["real_postings"] == 3
+
+    db.expire_all()
+    posting = db.get(JobPosting, "imported_public_jd_1")
+    assert posting is not None
+    assert "13800138000" not in posting.raw_text
+    assert "[手机号已脱敏]" in posting.raw_text
+
+
+def test_import_job_postings_requires_real_posting_date(client) -> None:
+    response = client.post(
+        "/api/v1/job-market/import",
+        json={
+            "postings": [
+                {
+                    "id": "missing-date-jd",
+                    "title": "数据标注工程师",
+                    "raw_text": "岗位职责：负责图像数据标注、质量检查和标注结果复核，确保训练数据符合业务标准，并持续记录问题反馈和处理过程。",
+                    "source_name": "公开招聘平台",
+                    "source_url": "https://example.com/missing-date-jd",
+                    "data_flag": "REAL",
+                }
+            ]
+        },
+    )
+    assert response.status_code == 422
+    assert "发布日期" in response.text

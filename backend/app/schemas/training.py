@@ -117,5 +117,17 @@ class PublishTaskRequest(BaseModel):
     published_by: str = Field(min_length=1, max_length=128)
 
 
+class TaskSkillUpdate(BaseModel):
+    skill_code: str = Field(min_length=1, max_length=96)
+    weight: float = Field(ge=0, le=1)
+    target_level: int | None = Field(default=None, ge=1, le=4)
+
+
+class UpdateTrainingTaskRequest(TrainingTaskDraft):
+    """教师可修改任务的全部教学内容；发布状态保持不变。"""
+
+    skills: list[TaskSkillUpdate] = Field(min_length=1, max_length=20)
+
+
 class TaskGenerationSources(BaseModel):
     sources: list[SourceRef] = Field(default_factory=list)

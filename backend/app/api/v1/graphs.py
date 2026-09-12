@@ -13,8 +13,9 @@ from sqlalchemy.orm import Session, selectinload
 from app.agents.competency_graph import CompetencyGraphAgent, GraphGenerationInput
 from app.core.db import get_db
 from app.core.enums import SKILL_BEARING_NODE_TYPES, GraphStatus, SkillStatus
-from app.core.errors import NotFoundError, ValidationError
+from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.models.competency import CompetencyGraph, CompetencyNode
+from app.models.job_market import JobPosting, JobPostingSkill
 from app.models.ontology import Job, Skill
 from app.schemas.common import Page
 from app.schemas.competency import (
@@ -24,7 +25,12 @@ from app.schemas.competency import (
     GraphSummary,
     NodeRead,
 )
-from app.schemas.competency_edit import NodeCreateRequest, NodeUpdateRequest
+from app.schemas.competency_edit import (
+    JobEvidenceCandidateRead,
+    LinkJobEvidenceRequest,
+    NodeCreateRequest,
+    NodeUpdateRequest,
+)
 from app.services.competency_graph_service import CompetencyGraphService
 
 router = APIRouter(prefix="/graphs", tags=["competency-graph"])
@@ -85,6 +91,18 @@ def generate_graph(
             "技能表为空，无法生成图谱。请先运行 scripts/seed_skills.py 载入技能规范表"
         )
 
+    selected_codes = list(dict.fromkeys(payload.selected_skill_codes))
+    if selected_codes:
+        selected_set = set(selected_codes)
+        skills = [skill for skill in skills if skill.skill_code in selected_set]
+        found_codes = {skill.skill_code for skill in skills}
+        missing_codes = selected_set - found_codes
+        if missing_codes:
+            raise ValidationError(
+                "所选能力中存在不可用的技能编码，请返回岗位需求分析后重新选择。",
+                detail={"missing_skill_codes": sorted(missing_codes)},
+            )
+
     agent = CompetencyGraphAgent()
     envelope = agent.run(
         db,
@@ -104,6 +122,8 @@ def generate_graph(
         draft=envelope.result,
         sources=envelope.sources,
         generation_run_id=envelope.llm_run_id,
+        allowed_skill_codes=set(selected_codes) if selected_codes else None,
+        selected_skill_codes=selected_codes,
     )
     db.commit()
     db.refresh(result.graph)
@@ -186,6 +206,94 @@ def get_node(graph_id: str, node_id: str, db: Session = Depends(get_db)) -> Node
     return NodeRead.from_node(node, [NodeRead.from_node(c) for c in node.children])
 
 
+def _job_evidence_candidates(
+    db: Session, graph: CompetencyGraph, node: CompetencyNode
+) -> list[tuple[JobPostingSkill, JobPosting]]:
+    if not node.skill_code:
+        raise ValidationError("只有带技能编码的技能点或知识点可以关联岗位原文。")
+    return db.execute(
+        select(JobPostingSkill, JobPosting)
+        .join(JobPosting, JobPosting.id == JobPostingSkill.posting_id)
+        .where(
+            JobPosting.job_id == graph.job_id,
+            JobPostingSkill.skill_code == node.skill_code,
+        )
+        .order_by(JobPosting.posted_at.desc(), JobPosting.id)
+        .limit(20)
+    ).all()
+
+
+@router.get(
+    "/{graph_id}/nodes/{node_id}/job-evidence-candidates",
+    response_model=list[JobEvidenceCandidateRead],
+    summary="查询可关联的岗位原文",
+)
+def job_evidence_candidates(
+    graph_id: str, node_id: str, db: Session = Depends(get_db)
+) -> list[JobEvidenceCandidateRead]:
+    graph = db.get(CompetencyGraph, graph_id)
+    node = db.get(CompetencyNode, node_id)
+    if graph is None or node is None or node.graph_id != graph_id:
+        raise NotFoundError("未找到图谱节点", detail={"graph_id": graph_id, "node_id": node_id})
+    return [
+        JobEvidenceCandidateRead(
+            posting_id=posting.id,
+            title=posting.title,
+            city=posting.city,
+            posted_at=posting.posted_at.isoformat() if posting.posted_at else None,
+            source_name=posting.source_name,
+            source_url=posting.source_url,
+            evidence_span=link.evidence_span,
+        )
+        for link, posting in _job_evidence_candidates(db, graph, node)
+    ]
+
+
+@router.post(
+    "/{graph_id}/nodes/{node_id}/job-evidence",
+    response_model=NodeRead,
+    summary="关联岗位原文作为节点依据",
+)
+def link_job_evidence(
+    graph_id: str,
+    node_id: str,
+    payload: LinkJobEvidenceRequest,
+    db: Session = Depends(get_db),
+) -> NodeRead:
+    graph = db.get(CompetencyGraph, graph_id)
+    node = db.get(CompetencyNode, node_id)
+    if graph is None or node is None or node.graph_id != graph_id:
+        raise NotFoundError("未找到图谱节点", detail={"graph_id": graph_id, "node_id": node_id})
+    if graph.status is not GraphStatus.DRAFT:
+        raise ConflictError("已审核或已归档图谱不可修改依据；请生成新草稿后再调整。")
+
+    candidate_by_id = {posting.id: (link, posting) for link, posting in _job_evidence_candidates(db, graph, node)}
+    selected_ids = list(dict.fromkeys(payload.posting_ids))
+    missing_ids = set(selected_ids) - set(candidate_by_id)
+    if missing_ids:
+        raise ValidationError("所选岗位原文与当前节点技能不匹配。", detail={"posting_ids": sorted(missing_ids)})
+
+    job_evidence = []
+    for posting_id in selected_ids:
+        link, posting = candidate_by_id[posting_id]
+        job_evidence.append(
+            {
+                "type": "job_posting",
+                "posting_id": posting.id,
+                "source_name": posting.source_name,
+                "source_url": posting.source_url,
+                "section": posting.title,
+                "page": posting.posted_at.date().isoformat() if posting.posted_at else None,
+                "quote": link.evidence_span,
+            }
+        )
+    node.evidence = [item for item in node.evidence if item.get("type") != "job_posting"] + job_evidence
+    node.edited_by_human = True
+    db.commit()
+    db.refresh(node)
+    return NodeRead.from_node(node, [NodeRead.from_node(child) for child in node.children])
+
+
 @router.patch(
     "/{graph_id}/nodes/{node_id}",
     response_model=NodeRead,
@@ -232,6 +340,17 @@ def delete_node(
     removed = CompetencyGraphService(db).delete_node(graph_id, node_id)
     db.commit()
     return {"removed": removed}
+
+
+@router.delete(
+    "/{graph_id}",
+    summary="删除图谱草稿",
+    description="仅可删除未审核通过的草稿图谱；关联节点将一并删除。",
+)
+def delete_graph(graph_id: str, db: Session = Depends(get_db)) -> dict[str, bool]:
+    CompetencyGraphService(db).delete_draft(graph_id)
+    db.commit()
+    return {"deleted": True}
 
 
 @router.post(

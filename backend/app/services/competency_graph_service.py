@@ -21,6 +21,7 @@ from app.core.enums import GraphStatus, NodeType, SKILL_BEARING_NODE_TYPES
 from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.core.logging import get_logger
 from app.models.competency import CompetencyGraph, CompetencyNode
+from app.models.job_market import JobPosting, JobPostingSkill
 from app.models.ontology import Job, Skill
 from app.schemas.common import SourceRef
 from app.schemas.competency import CompetencyGraphDraft, NodeDraft
@@ -69,6 +70,8 @@ class CompetencyGraphService:
         draft: CompetencyGraphDraft,
         sources: list[SourceRef],
         generation_run_id: str | None = None,
+        allowed_skill_codes: set[str] | None = None,
+        selected_skill_codes: list[str] | None = None,
     ) -> PersistResult:
         version = self.next_version(job.id)
         graph_id = self.graph_id_for(job.id, version)
@@ -78,9 +81,10 @@ class CompetencyGraphService:
             job_id=job.id,
             version=version,
             status=GraphStatus.DRAFT,
-            title=f"{job.name}能力图谱 v{version}",
+            title=f"{job.name}_能力图谱 v{version}",
             summary=draft.summary or None,
             generation_run_id=generation_run_id,
+            selected_skill_codes=list(dict.fromkeys(selected_skill_codes or [])),
         )
         self._db.add(graph)
         self._db.flush()
@@ -89,6 +93,32 @@ class CompetencyGraphService:
         marker_map = {s.marker: s for s in sources if s.marker}
         counters: dict[str, int] = {}
         warnings: list[str] = []
+        job_evidence_cache: dict[str, list[dict]] = {}
+
+        def job_evidence_for(skill_code: str) -> list[dict]:
+            if skill_code not in job_evidence_cache:
+                rows = self._db.execute(
+                    select(JobPostingSkill, JobPosting)
+                    .join(JobPosting, JobPosting.id == JobPostingSkill.posting_id)
+                    .where(
+                        JobPosting.job_id == job.id,
+                        JobPostingSkill.skill_code == skill_code,
+                    )
+                    .order_by(JobPosting.posted_at.desc(), JobPosting.id)
+                ).all()
+                job_evidence_cache[skill_code] = [
+                    {
+                        "type": "job_posting",
+                        "posting_id": posting.id,
+                        "source_name": posting.source_name,
+                        "source_url": posting.source_url,
+                        "section": posting.title,
+                        "page": posting.posted_at.date().isoformat() if posting.posted_at else None,
+                        "quote": link.evidence_span,
+                    }
+                    for link, posting in rows
+                ]
+            return job_evidence_cache[skill_code]
 
         # 根节点：岗位本身。由服务端创建，不交给模型。
         root = CompetencyNode(
@@ -131,7 +161,9 @@ class CompetencyGraphService:
         def walk(node: NodeDraft, parent_id: str, order: int) -> None:
             skill_code = None
             if node.is_skill_bearing:
-                skill_code = self._resolve_skill(node, normalizer, warnings)
+                skill_code = self._resolve_skill(
+                    node, normalizer, warnings, allowed_skill_codes=allowed_skill_codes
+                )
                 if skill_code is None:
                     # 无法 join 的技能点留着只会制造「看起来很完整」的假象
                     return
@@ -148,7 +180,10 @@ class CompetencyGraphService:
                     skill_code=skill_code,
                     mastery_level=node.mastery_level,
                     order_index=order,
-                    evidence=evidence_for(node),
+                    evidence=(
+                        evidence_for(node) + job_evidence_for(skill_code)
+                        if skill_code else evidence_for(node)
+                    ),
                     ai_generated=True,
                 )
             )
@@ -182,7 +217,12 @@ class CompetencyGraphService:
         return PersistResult(graph=graph, warnings=warnings)
 
     def _resolve_skill(
-        self, node: NodeDraft, normalizer: SkillNormalizer, warnings: list[str]
+        self,
+        node: NodeDraft,
+        normalizer: SkillNormalizer,
+        warnings: list[str],
+        *,
+        allowed_skill_codes: set[str] | None = None,
     ) -> str | None:
         """把模型给的技能编码解析到技能表。
 
@@ -194,6 +234,11 @@ class CompetencyGraphService:
                 continue
             resolved = normalizer.resolve(candidate)
             if resolved:
+                if allowed_skill_codes is not None and resolved not in allowed_skill_codes:
+                    warnings.append(
+                        f"节点「{node.name}」对应技能 {resolved} 未被纳入本次图谱，已跳过"
+                    )
+                    return None
                 if node.skill_code and resolved != node.skill_code:
                     warnings.append(
                         f"节点「{node.name}」的技能编码 {node.skill_code} 已归一为 {resolved}"
@@ -327,6 +372,18 @@ class CompetencyGraphService:
         self._db.flush()
         logger.info("节点已删除", extra={"node_id": node_id, "removed": removed})
         return removed
+
+    def delete_draft(self, graph_id: str) -> None:
+        """删除尚未审核通过的图谱草稿及其全部节点。"""
+        graph = self._db.get(CompetencyGraph, graph_id)
+        if graph is None:
+            raise NotFoundError(f"未找到图谱：{graph_id}", detail={"graph_id": graph_id})
+        if graph.status is not GraphStatus.DRAFT:
+            raise ConflictError("仅草稿图谱可删除；已审核或已归档图谱需要保留以维持下游引用。")
+
+        self._db.delete(graph)
+        self._db.flush()
+        logger.info("图谱草稿已删除", extra={"graph_id": graph_id})
 
     def _count_descendants(self, node: CompetencyNode) -> int:
         return sum(1 + self._count_descendants(c) for c in node.children)

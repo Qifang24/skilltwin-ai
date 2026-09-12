@@ -82,3 +82,32 @@ class JobMarketAnalyzeResponse(BaseModel):
     snapshots_written: int = 0
     reasoning_summary: str
     warnings: list[str] = Field(default_factory=list)
+
+
+class JobPostingImportItem(BaseModel):
+    id: str = Field(min_length=2, max_length=96)
+    title: str = Field(min_length=2, max_length=255)
+    raw_text: str = Field(min_length=40)
+    source_name: str = Field(min_length=2, max_length=128)
+    source_url: str = Field(min_length=8, max_length=1024)
+    posted_at: datetime | None = None
+    city: str | None = None
+    company_type: str | None = None
+    salary_text: str | None = None
+    education_req: str | None = None
+    experience_req: str | None = None
+    data_flag: DataFlag = DataFlag.REAL
+
+
+class JobPostingImportRequest(BaseModel):
+    job_id: str = Field(default="ai_data_annotator", min_length=2, max_length=96)
+    job_name: str = Field(default="AI 数据标注工程师", min_length=2, max_length=255)
+    postings: list[JobPostingImportItem] = Field(min_length=1, max_length=500)
+
+
+class JobPostingImportResponse(BaseModel):
+    created: int
+    updated: int
+    skipped_duplicates: int
+    pii_scrubbed: int
+    dashboard: JobMarketDashboardRead

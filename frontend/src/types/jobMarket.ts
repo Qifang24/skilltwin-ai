@@ -72,3 +72,42 @@ export interface JobMarketAnalyzeResponse {
   reasoning_summary: string
   warnings: string[]
 }
+
+export interface JobEvidenceCandidate {
+  posting_id: string
+  title: string
+  city: string | null
+  posted_at: string | null
+  source_name: string | null
+  source_url: string | null
+  evidence_span: string
+}
+
+export interface JobPostingImportItem {
+  id: string
+  title: string
+  raw_text: string
+  source_name: string
+  source_url: string
+  posted_at: string | null
+  city?: string | null
+  company_type?: string | null
+  salary_text?: string | null
+  education_req?: string | null
+  experience_req?: string | null
+  data_flag?: MarketDataFlag
+}
+
+export interface JobPostingImportPayload {
+  job_id?: string
+  job_name?: string
+  postings: JobPostingImportItem[]
+}
+
+export interface JobPostingImportResponse {
+  created: number
+  updated: number
+  skipped_duplicates: number
+  pii_scrubbed: number
+  dashboard: JobMarketDashboard
+}

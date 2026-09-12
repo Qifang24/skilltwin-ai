@@ -5,51 +5,12 @@
  * 避免出现「看起来能用、点进去是空的」的演示型 UI。
  */
 
-import { Badge, Card, Col, Row, Space, Tag, Typography } from 'antd'
+import { Button, Card, Col, Row, Space, Tag, Typography } from 'antd'
 import { Link } from 'react-router-dom'
 
 import { SystemStatusCard } from '@/components/SystemStatusCard'
 
-const { Title, Paragraph, Text } = Typography
-
-interface FeatureEntry {
-  name: string
-  phase: string
-  ready: boolean
-}
-
-const TEACHER_FEATURES: FeatureEntry[] = [
-  { name: '岗位能力图谱生成与审核', phase: 'Phase 5–6', ready: true },
-  { name: '实训任务生成与发布', phase: 'Phase 7', ready: true },
-  { name: '岗位需求趋势分析', phase: 'Phase 10', ready: true },
-  { name: '课程 Gap Analysis', phase: 'Phase 11', ready: true },
-  { name: '培养方案优化建议', phase: 'Phase 12', ready: true },
-  { name: '真实用户测试与报告', phase: 'Phase 15', ready: true },
-]
-
-const STUDENT_FEATURES: FeatureEntry[] = [
-  { name: '岗位能力诊断测评', phase: 'Phase 8', ready: true },
-  { name: '能力雷达图与置信区间', phase: 'Phase 8', ready: true },
-  { name: '能力 Gap 分析', phase: 'Phase 8', ready: true },
-  { name: '个性化学习路径', phase: 'Phase 9', ready: true },
-  { name: 'AI 学习助手', phase: 'Phase 13', ready: true },
-]
-
-function FeatureList({ features }: { features: FeatureEntry[] }) {
-  return (
-    <Space orientation="vertical" size={8} style={{ width: '100%' }}>
-      {features.map((feature) => (
-        <Space key={feature.name} size={8}>
-          <Badge status={feature.ready ? 'success' : 'default'} />
-          <Text type={feature.ready ? undefined : 'secondary'}>{feature.name}</Text>
-          <Tag color={feature.ready ? 'green' : 'default'}>
-            {feature.ready ? '已上线' : feature.phase}
-          </Tag>
-        </Space>
-      ))}
-    </Space>
-  )
-}
+const { Title, Paragraph } = Typography
 
 export function Home() {
   return (
@@ -57,59 +18,78 @@ export function Home() {
       <section className="landing-hero" aria-labelledby="landing-title">
         <div className="landing-hero__copy">
           <div className="landing-hero__eyebrow">
-            <span aria-hidden="true">◇</span> Evidence-based AI · 可追溯、可审核
+            <span aria-hidden="true">✦</span> 可追溯 · 可审核 · 可持续优化
           </div>
           <Title id="landing-title" level={1} className="landing-hero__title">
-            让岗位定义学习，<br />
-            <span>让能力驱动成长</span>
+            以岗位需求定教学，<br />
+            <span>以能力差距促成长</span>
           </Title>
           <Paragraph className="landing-hero__description">
-            面向人工智能技术应用专业群，将真实岗位需求转化为课程、实训与学生的个性化成长路径。
+            面向人工智能技术应用专业群，以真实岗位需求驱动课程、实训与个性化成长。
           </Paragraph>
           <Space wrap size={[8, 8]}>
             <Tag color="blue">AI 数据标注工程师</Tag>
             <Tag color="cyan">岗位证据可回查</Tag>
             <Tag color="green">学习闭环可量化</Tag>
           </Space>
+          <div className="landing-hero__actions">
+            <Link to="/teacher"><Button type="primary" size="large">我是教师，开始备课</Button></Link>
+            <Link to="/student"><Button size="large">我是学生，开始学习</Button></Link>
+          </div>
+          <p className="landing-hero__proof">
+            <span aria-hidden="true">✓</span> 以岗位原文、职业标准和教师审核作为每一项建议的依据
+          </p>
         </div>
-        <div className="learning-loop" aria-label="SkillTwin AI 学习闭环">
-          <div className="learning-loop__item"><span>01</span>产业岗位需求</div>
-          <div className="learning-loop__arrow">→</div>
-          <div className="learning-loop__item"><span>02</span>岗位能力图谱</div>
-          <div className="learning-loop__arrow">→</div>
-          <div className="learning-loop__item"><span>03</span>课程与实训</div>
-          <div className="learning-loop__arrow">→</div>
-          <div className="learning-loop__item learning-loop__item--accent"><span>04</span>学生能力成长</div>
+        <div className="learning-loop" aria-label="SkillTwin AI 教学能力闭环">
+          <div className="learning-loop__heading">
+            <span>SKILLTWIN LOOP</span>
+            <strong>岗位驱动的教学闭环</strong>
+          </div>
+          <div className="learning-loop__grid">
+            <div className="learning-loop__item"><span>01</span><strong>岗位洞察</strong><small>真实 JD 与技能需求</small></div>
+            <div className="learning-loop__item"><span>02</span><strong>能力建模</strong><small>图谱生成与教师审核</small></div>
+            <div className="learning-loop__item"><span>03</span><strong>实训设计</strong><small>学习型任务与评价</small></div>
+            <div className="learning-loop__item learning-loop__item--accent"><span>04</span><strong>成长反馈</strong><small>诊断、路径与复测</small></div>
+          </div>
         </div>
       </section>
 
       <Row gutter={[24, 24]}>
         <Col xs={24} md={12}>
           <Card
-            className="portal-card"
-            title={<Space><span className="portal-card__symbol" aria-hidden="true">教</span> 教师端</Space>}
+            className="portal-card portal-card--teacher"
             hoverable
-            extra={<Link to="/teacher">进入工作台 →</Link>}
           >
-            {/* 中文正文写成单行：JSX 会把换行折成空格，多行会在标点后留下空隙 */}
-            <Paragraph type="secondary">
-              面向专业负责人与任课教师：分析岗位需求变化，审核岗位能力图谱，对照课程找出能力缺口，并生成可直接用于教学的实训任务。
-            </Paragraph>
-            <FeatureList features={TEACHER_FEATURES} />
+            <div className="portal-card__role">
+              <span className="portal-card__emoji" aria-hidden="true">📚</span>
+              <Title level={2}>教师端</Title>
+              <Paragraph className="portal-card__description">
+                从岗位需求出发，审核能力要求，生成并发布实训任务。
+              </Paragraph>
+              <div className="portal-steps">
+                <span>了解岗位</span><span>审核图谱</span><span>发布实训</span>
+              </div>
+              <Link to="/teacher"><Button type="primary" size="large">进入教师工作台 →</Button></Link>
+            </div>
           </Card>
         </Col>
 
         <Col xs={24} md={12}>
           <Card
-            className="portal-card"
-            title={<Space><span className="portal-card__symbol" aria-hidden="true">学</span> 学生端</Space>}
+            className="portal-card portal-card--student"
             hoverable
-            extra={<Link to="/student">进入学习中心 →</Link>}
           >
-            <Paragraph type="secondary">
-              面向学生：选定目标岗位后完成能力诊断，系统生成个人能力画像，对比岗位要求算出差距，并给出可执行的个性化学习路径。
-            </Paragraph>
-            <FeatureList features={STUDENT_FEATURES} />
+            <div className="portal-card__role">
+              <span className="portal-card__emoji" aria-hidden="true">🎓</span>
+              <Title level={2}>学生端</Title>
+              <Paragraph className="portal-card__description">
+                完成能力诊断，查看能力差距，按个人学习路径练习与复测。
+              </Paragraph>
+              <div className="portal-steps">
+                <span>能力诊断</span><span>查看差距</span><span>按路径学习</span>
+              </div>
+              <Link to="/student"><Button type="primary" size="large">进入学习中心 →</Button></Link>
+            </div>
           </Card>
         </Col>
       </Row>

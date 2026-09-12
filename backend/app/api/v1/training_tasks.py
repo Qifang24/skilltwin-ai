@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.agents.training_task import TaskGenerationInput, TrainingTaskAgent
 from app.core.db import get_db
 from app.core.enums import TaskDifficulty, TaskStatus
-from app.core.errors import NotFoundError
+from app.core.errors import ConflictError, NotFoundError
 from app.models.competency import CompetencyNode
 from app.models.ontology import Job, Skill
 from app.models.training import TrainingTask
+from app.rag.retriever import HybridRetriever
 from app.schemas.common import Page
 from app.schemas.training import (
     GenerateTaskRequest,
@@ -20,7 +21,9 @@ from app.schemas.training import (
     TaskSkillRead,
     TrainingTaskDetail,
     TrainingTaskSummary,
+    UpdateTrainingTaskRequest,
 )
+from app.models.training import TrainingTaskSkill
 from app.services.training_task_service import TrainingTaskService
 
 router = APIRouter(prefix="/training-tasks", tags=["training-task"])
@@ -148,6 +151,104 @@ def get_task(task_id: str, db: Session = Depends(get_db)) -> TrainingTaskDetail:
     ).scalar_one_or_none()
     if task is None:
         raise NotFoundError(f"未找到任务：{task_id}", detail={"task_id": task_id})
+    return _detail(task, db)
+
+
+@router.patch(
+    "/{task_id}",
+    response_model=TrainingTaskDetail,
+    summary="教师修改实训任务",
+)
+def update_task(
+    task_id: str, payload: UpdateTrainingTaskRequest, db: Session = Depends(get_db)
+) -> TrainingTaskDetail:
+    task = db.execute(
+        select(TrainingTask)
+        .options(selectinload(TrainingTask.skills))
+        .where(TrainingTask.id == task_id)
+    ).scalar_one_or_none()
+    if task is None:
+        raise NotFoundError(f"未找到任务：{task_id}", detail={"task_id": task_id})
+
+    unknown_codes = [
+        item.skill_code for item in payload.skills if db.get(Skill, item.skill_code) is None
+    ]
+    if unknown_codes:
+        raise ConflictError(f"存在未收录的技能编码：{', '.join(sorted(set(unknown_codes)))}")
+    if sum(item.weight for item in payload.skills) <= 0:
+        raise ConflictError("训练技能权重总和必须大于 0")
+
+    task.title = payload.title
+    task.scenario = payload.scenario
+    task.difficulty = payload.difficulty
+    task.est_minutes = payload.est_minutes
+    task.objectives = [item.model_dump() for item in payload.objectives]
+    task.steps = [item.model_dump() for item in sorted(payload.steps, key=lambda item: item.order)]
+    task.deliverables = list(payload.deliverables)
+    task.rubric = [item.model_dump() for item in payload.rubric]
+    task.common_mistakes = [item.model_dump() for item in payload.common_mistakes]
+    task.extensions = list(payload.extensions)
+    task.safety_notes = payload.safety_notes
+    task.edited_by_human = True
+    db.execute(delete(TrainingTaskSkill).where(TrainingTaskSkill.task_id == task_id))
+    for item in payload.skills:
+        db.add(TrainingTaskSkill(
+            task_id=task_id,
+            skill_code=item.skill_code,
+            weight=item.weight,
+            target_level=item.target_level,
+        ))
+    db.commit()
+    task = db.execute(
+        select(TrainingTask)
+        .options(selectinload(TrainingTask.skills))
+        .where(TrainingTask.id == task_id)
+    ).scalar_one()
+    return _detail(task, db)
+
+
+@router.post(
+    "/{task_id}/refresh-citations",
+    response_model=TrainingTaskDetail,
+    summary="重新检索知识库依据",
+)
+def refresh_task_citations(
+    task_id: str, db: Session = Depends(get_db)
+) -> TrainingTaskDetail:
+    task = db.execute(
+        select(TrainingTask)
+        .options(selectinload(TrainingTask.skills))
+        .where(TrainingTask.id == task_id)
+    ).scalar_one_or_none()
+    if task is None:
+        raise NotFoundError(f"未找到任务：{task_id}", detail={"task_id": task_id})
+    if task.status is not TaskStatus.DRAFT:
+        raise ConflictError("已发布任务不能更新设计依据；请创建新草稿后再检索。")
+
+    source_node = db.get(CompetencyNode, task.source_node_id) if task.source_node_id else None
+    skill_names = [
+        skill.name_zh
+        for link in task.skills
+        if (skill := db.get(Skill, link.skill_code)) is not None
+    ]
+    query = " ".join(
+        part
+        for part in (task.title, source_node.name if source_node else None, *skill_names, "实训 操作规范 教学要求")
+        if part
+    )
+    chunks = HybridRetriever().search(db, query, top_n=6)
+    task.citations = [
+        {
+            "chunk_id": chunk.chunk_id,
+            "source_name": chunk.source_name,
+            "page": chunk.page,
+            "section": chunk.section,
+            "quote": chunk.text[:300],
+        }
+        for chunk in chunks
+    ]
+    db.commit()
+    db.refresh(task)
     return _detail(task, db)
 
 
