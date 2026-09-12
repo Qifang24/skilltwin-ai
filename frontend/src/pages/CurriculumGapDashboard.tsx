@@ -1,18 +1,27 @@
-import { Alert, Card, Empty, Space, Table, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Empty, Space, Table, Tag, Typography } from 'antd'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+
+import { PageHero } from '@/components/PageHero'
 
 import { fetchCurriculumGap, toErrorMessage } from '@/services/api'
 import type { CurriculumSkillGap } from '@/types/curriculum'
 
-const { Title, Paragraph, Text } = Typography
+const { Paragraph, Text } = Typography
 const TARGET_JOB = 'ai_data_annotator'
 const STATUS: Record<CurriculumSkillGap['status'], [string, string]> = { unmapped: ['red', '未映射'], introduced: ['gold', '已提及'], practice: ['green', '实践目标'] }
 
 export function CurriculumGapDashboard() {
+  const navigate = useNavigate()
   const query = useQuery({ queryKey: ['curriculum-gap', TARGET_JOB], queryFn: () => fetchCurriculumGap(TARGET_JOB) })
   const data = query.data
-  return <Space orientation="vertical" size={24} style={{ width: '100%' }}>
-    <div><Title level={2}>课程覆盖与岗位能力 Gap</Title><Paragraph type="secondary">课程映射仅基于已导入方案原文；“未映射”表示当前结构化范围内未见证据，不等同于课程未教学。</Paragraph></div>
+  return <Space className="curriculum-page" orientation="vertical" size={24} style={{ width: '100%' }}>
+    <PageHero
+      eyebrow={'\u8bfe\u7a0b\u5bf9\u6807'}
+      title={'\u8bfe\u7a0b\u8986\u76d6\u4e0e\u5c97\u4f4d\u80fd\u529b\u5bf9\u6807'}
+      description={'\u67e5\u770b\u8bfe\u7a0b\u5bf9\u5c97\u4f4d\u80fd\u529b\u7684\u8986\u76d6\u60c5\u51b5\u4e0e\u539f\u6587\u8bc1\u636e\u3002'}
+      actions={<Button type="primary" onClick={() => navigate('/admin')}>{'\u2190 \u8fd4\u56de\u7ba1\u7406\u7aef'}</Button>}
+    />
     {query.isError ? <Alert type="error" showIcon title="无法读取课程 Gap 数据" description={toErrorMessage(query.error)} /> : null}
     {data ? <>
       {data.data_quality.warnings.map((warning) => <Alert key={warning} type="warning" showIcon title={warning} />)}

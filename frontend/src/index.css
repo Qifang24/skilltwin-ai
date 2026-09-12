@@ -320,6 +320,7 @@ code {
 .student-workspace .page-hero__description.ant-typography { font-size: 14px; }
 .student-workspace .page-hero__meta { margin-top: 12px; }
 .student-workspace .page-hero__meta .ant-space { justify-content: center; }
+.student-workspace .page-hero__actions { position: absolute; top: 18px; right: 20px; }
 .student-workflow-card > .ant-card-head { background: linear-gradient(100deg, #f8fbff, #fff); }
 .student-workflow-card > .ant-card-body { padding: 16px 18px; }
 .student-workflow-step { min-height: 230px; border: 0 !important; overflow: hidden; }
@@ -535,6 +536,74 @@ code {
 .task-detail-card--safety { border-color: #b8ddd4 !important; background: linear-gradient(135deg, #f6fcfa, #e4f5ef) !important; }.task-detail-card--safety > .ant-card-head { border-bottom-color: #d0ebe3; background: #def2eb; }.task-detail-card--safety .ant-card-head-title { color: #286c60; }
 .task-detail-card--extensions { border-color: #d7cdf2 !important; background: linear-gradient(135deg, #fbfaff, #f0edfc) !important; }.task-detail-card--extensions > .ant-card-head { border-bottom-color: #e3dcf6; background: #eeeafd; }.task-detail-card--extensions .ant-card-head-title { color: #65528d; }
 .student-published-tasks-card { border-color: #b8dcd7 !important; background: linear-gradient(135deg, #f4fcfa, #e5f5f2) !important; box-shadow: 0 9px 20px rgba(33, 116, 108, .08); }.student-published-tasks-card > .ant-card-head { border-bottom-color: #d3eae5; background: #def2ee; }.student-published-tasks-card > .ant-card-head .ant-card-head-title { color: #236e67; font-weight: 800; }.student-published-tasks-card .ant-list-item { padding-inline: 14px; border-bottom-color: #d9ece8; }.student-published-tasks-card .ant-list-item:last-child { border-bottom: 0; }.student-published-tasks-card .ant-list-item-meta-title { margin-bottom: 6px !important; }
+
+/* 学生端按学习流程展示：诊断结果与练习内容不再堆在首页。 */
+.student-step-section { scroll-margin-top: 24px; }
+.student-step-section__card { overflow: hidden; }
+.student-step-section__card > .ant-card-head { min-height: 56px; }
+.student-step-section__card > .ant-card-head .ant-card-head-title { font-size: 17px; font-weight: 800; }
+.student-step-section__card > .ant-card-body { display: grid; gap: 16px; padding: 18px; }
+.student-step-section--diagnostic .student-step-section__card { border-color: #b8ddd5; background: linear-gradient(145deg, #f9fffd, #edf9f6); }
+.student-step-section--diagnostic .student-step-section__card > .ant-card-head { background: #def3ed; border-bottom-color: #c8e6de; }
+.student-step-section--diagnostic .student-step-section__card > .ant-card-head .ant-card-head-title { color: #176e61; }
+.student-diagnostic-content { display: grid; gap: 16px; }
+.student-diagnostic-stat { overflow: hidden; border-width: 1px !important; box-shadow: 0 8px 18px rgba(37, 80, 104, .07); }
+.student-diagnostic-stat .ant-card-body { padding: 18px 20px; }
+.student-diagnostic-stat .ant-statistic-title,
+.student-diagnostic-stat .ant-statistic-content,
+.student-diagnostic-stat .ant-statistic-content-value { font-weight: 800; }
+.student-diagnostic-stat--measured { border-color: #91c9f3 !important; background: linear-gradient(135deg, #dff1ff, #c9e7fb) !important; }
+.student-diagnostic-stat--achieved { border-color: #9bd9ad !important; background: linear-gradient(135deg, #dcf5e3, #c8ecd2) !important; }
+.student-diagnostic-stat--evidence { border-color: #efc978 !important; background: linear-gradient(135deg, #fff0cc, #ffe3a6) !important; }
+.student-diagnostic-stat__suffix { vertical-align: middle; font-size: 15px; font-weight: 600; }
+.student-diagnostic-stat__suffix .ant-tag { margin: 0; font-size: 12px; font-weight: 700; vertical-align: middle; }
+.student-diagnostic-stat-row > .ant-col { display: flex; }
+.student-diagnostic-stat-row .student-diagnostic-stat { width: 100%; }
+.student-diagnostic-chart { border-width: 1px !important; box-shadow: 0 9px 20px rgba(39, 78, 112, .06); }
+.student-diagnostic-chart--radar { border-color: #b8d8f5 !important; background: linear-gradient(145deg, #f4faff, #e5f2ff) !important; }
+.student-diagnostic-chart--radar > .ant-card-head { border-bottom-color: #cce4f9; background: rgba(214, 235, 253, .65); }
+.student-diagnostic-chart--interval { border-color: #cfc1ec !important; background: linear-gradient(145deg, #faf7ff, #eee8fb) !important; }
+.student-diagnostic-chart--interval > .ant-card-head { border-bottom-color: #ddd3f2; background: rgba(232, 224, 249, .7); }
+.student-diagnostic-chart-row > .ant-col { display: flex; }
+.student-diagnostic-chart-row .student-diagnostic-chart { width: 100%; }
+.student-diagnostic-gap-table { border-color: #a9cde4 !important; background: linear-gradient(145deg, #eaf5fc, #d7eaf6) !important; }
+.student-diagnostic-gap-table > .ant-card-head { border-bottom-color: #b8d5e8; background: #c5e1f1; }
+.student-diagnostic-gap-table > .ant-card-head .ant-card-head-title { font-weight: 800; }
+.student-diagnostic-gap-table .ant-table-wrapper { border: 1px solid #a9cde4; border-radius: 10px; overflow: hidden; }
+.student-diagnostic-gap-table .ant-table-thead > tr > th { background: #b8daee !important; border-bottom-color: #9dc6df !important; font-weight: 800; }
+.student-diagnostic-gap-table .ant-table-tbody > tr > td { border-bottom-color: #c1dce9 !important; }
+.student-diagnostic-gap-table .ant-table-tbody > tr:nth-child(odd) > td { background: #f2f9fd; }
+.student-diagnostic-gap-table .ant-table-tbody > tr:nth-child(even) > td { background: #dceef8; }
+.student-evidence-tag { margin-inline-start: 2px !important; border: 0 !important; border-radius: 999px !important; font-size: 11px !important; line-height: 19px !important; font-weight: 700; }
+.student-diagnostic-next-action { display: flex; justify-content: center; padding: 8px 0 2px; }
+.student-diagnostic-next-action .ant-btn { min-width: 240px; min-height: 52px; font-size: 18px; font-weight: 800; }
+.student-learning-path-page { border-color: #d1c4ee !important; background: linear-gradient(145deg, #fbfaff, #f1ecfb) !important; }
+.learning-path-item { margin: 10px 0; overflow: hidden; border-width: 1px !important; border-left-width: 5px !important; box-shadow: 0 4px 12px rgba(42, 62, 91, .05); }
+.learning-path-item .ant-card-body { padding: 14px 16px; }
+.learning-path-item--recommendation { border-color: #5eaee9 !important; background: #f4faff !important; }
+.learning-path-item--knowledge { border-color: #a493df !important; background: #faf8ff !important; }
+.learning-path-item--task { border-color: #62be8c !important; background: #f3fbf7 !important; }
+.learning-path-item--assessment { border-color: #e5ad4d !important; background: #fffaf0 !important; }
+.learning-path-item .ant-typography { font-size: 15px; }
+.learning-path-item .ant-btn-link { min-height: 32px; padding-inline: 9px; font-weight: 700; }
+.learning-path-item__type,
+.learning-path-item__status { margin: 0 !important; border: 0 !important; border-radius: 999px !important; font-size: 12px !important; line-height: 24px !important; font-weight: 800; }
+.learning-path-item__type--recommendation { color: #176eaa !important; background: #dcefff !important; }
+.learning-path-item__type--knowledge { color: #62469d !important; background: #ece6ff !important; }
+.learning-path-item__type--task { color: #19734a !important; background: #daf4e5 !important; }
+.learning-path-item__type--assessment { color: #9c6510 !important; background: #fff0cc !important; }
+.learning-path-next-card { border-color: #8fc3ee !important; background: linear-gradient(135deg, #eef8ff, #dbefff) !important; }
+.learning-path-next-card > .ant-card-head { border-bottom-color: #bee0f7; background: rgba(207, 233, 250, .62); }
+.learning-path-next-card > .ant-card-head .ant-card-head-title { color: #155d93; font-weight: 800; }
+.learning-path-next-card__description { display: grid; gap: 6px; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+.learning-path-next-card__line { display: block; color: #5d6d7e; line-height: 1.65; }
+.learning-path-regenerate { min-width: 154px; min-height: 48px; padding-inline: 20px; border-color: #e34d24 !important; background: linear-gradient(135deg, #ff7542, #e84a27) !important; box-shadow: 0 7px 16px rgba(224, 74, 39, .23); font-size: 16px; font-weight: 800; }
+.learning-path-regenerate:hover { border-color: #c8391b !important; background: #d94320 !important; }
+.student-step-section--practice .student-step-section__card { border-color: #d8caee; background: linear-gradient(145deg, #fcfbff, #f4effc); }
+.student-step-section--practice .student-step-section__card > .ant-card-head { background: #ebe3fa; border-bottom-color: #dcd0f0; }
+.student-step-section--practice .student-step-section__card > .ant-card-head .ant-card-head-title { color: #5e438c; }
+.student-step-section__card > .ant-card-body > .ant-card { margin: 0; }
+.student-step-section__card .ant-alert { margin: 0; }
 .task-detail-publish-card { border-color: #98d8d2 !important; background: linear-gradient(105deg, #effcfb, #d9f4f0) !important; box-shadow: 0 10px 23px rgba(18, 121, 125, .11); }.task-detail-publish-card > .ant-card-body { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 22px; }.task-detail-publish-card > .ant-card-body > div { display: grid; gap: 4px; }.task-detail-publish-card strong { color: #176a6d; font-size: 17px; }.task-detail-publish-card__button.ant-btn { min-width: 186px; min-height: 54px; border: 0; border-radius: 12px; background: linear-gradient(135deg, #31bdbd, #16878e); box-shadow: 0 8px 17px rgba(17, 122, 126, .22); color: #fff; font-size: 18px; font-weight: 850; }.task-detail-publish-card__button.ant-btn:hover { background: linear-gradient(135deg, #4bcaca, #2099a0) !important; color: #fff !important; }
 .task-detail__edit-button.ant-btn { min-width: 116px; min-height: 42px; border-color: #4a91ca; background: #edf7ff; color: #17639e; font-size: 15px; font-weight: 800; }.task-edit-form .ant-form-item { margin-bottom: 13px; }.task-edit-form .ant-form-item-label > label { color: #36516a; font-weight: 800; }.task-edit-form textarea { font-family: Consolas, 'Microsoft YaHei', monospace; font-size: 12px; line-height: 1.55; }
 @media (max-width: 620px) { .task-detail-publish-card > .ant-card-body { align-items: flex-start; flex-direction: column; }.task-detail-publish-card__button.ant-btn { width: 100%; } }
@@ -615,6 +684,15 @@ code {
 @media (max-width: 640px) { .market-recommendation__skill { grid-template-columns: auto 1fr; } .market-recommendation__skill .ant-btn { grid-column: 2; justify-self: start; } }
 
 .admin-tools-panel > .ant-card-head { background: linear-gradient(100deg, #f8fbff, #fff); }
+.admin-workspace .page-hero { flex-direction: column; justify-content: center; min-height: 0; padding: 27px clamp(32px, 3.5vw, 52px); text-align: center; }
+.admin-workspace .page-hero__content { max-width: 900px; text-align: center; }
+.admin-workspace .page-hero__eyebrow { margin-bottom: 9px; }
+.admin-workspace .page-hero__title.ant-typography { margin-bottom: 5px; font-size: clamp(30px, 2.5vw, 38px); }
+.admin-workspace .page-hero__description.ant-typography { font-size: 14px; }
+.curriculum-page .page-hero { align-items: center; justify-content: center; min-height: 206px; padding: 28px clamp(70px, 6vw, 100px); text-align: center; }
+.curriculum-page .page-hero__content { max-width: 920px; text-align: center; }
+.curriculum-page .page-hero__description.ant-typography { margin-inline: auto; }
+.curriculum-page .page-hero__actions { position: absolute; top: 18px; right: 20px; }
 .admin-tool-card { position: relative; min-height: 252px; overflow: hidden; border: 0 !important; }
 .admin-tool-card > .ant-card-body { display: flex; flex-direction: column; align-items: flex-start; height: 100%; box-sizing: border-box; padding: 26px; }
 .admin-tool-card--blue { background: linear-gradient(145deg, #e2f0ff, #cfe5ff); color: #164f87; }
@@ -627,6 +705,11 @@ code {
 .admin-tool-card .ant-typography:not(h1):not(h2):not(h3):not(h4):not(h5) { flex: 1; margin: 0 0 18px; color: color-mix(in srgb, currentColor 70%, #fff); font-size: 15px; line-height: 1.65; }
 .admin-tool-card .ant-btn { min-width: 150px; border-color: rgba(255,255,255,0.82); color: currentColor; background: rgba(255,255,255,0.72); }
 .job-import-card .ant-card-body { padding: 22px; }
+.job-data-import-page .page-hero { align-items: center; justify-content: center; min-height: 206px; padding: 28px clamp(70px, 6vw, 100px); text-align: center; }
+.job-data-import-page .page-hero__content { max-width: 920px; text-align: center; }
+.job-data-import-page .page-hero__description.ant-typography { margin-inline: auto; }
+.job-data-import-page .page-hero__meta .ant-tag { margin: 0; }
+.job-data-import-page .page-hero__actions { position: absolute; top: 18px; right: 20px; }
 .job-import-card__dropzone { margin-top: 18px; background: #fbfdff; border-color: #b9d7f3 !important; }
 .job-import-card__ready { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 18px; padding: 16px 18px; border-radius: 12px; background: #edf7ff; }
 .job-import-result b { color: #1565aa; font-size: 22px; }

@@ -50,6 +50,7 @@ export function SkillRadar({ gaps, height = 420, maxAxes = 8 }: SkillRadarProps)
       legend: {
         data: ['岗位目标要求', '当前水平'],
         bottom: 0,
+        textStyle: { fontWeight: 700 },
       },
       radar: {
         indicator,
@@ -57,6 +58,7 @@ export function SkillRadar({ gaps, height = 420, maxAxes = 8 }: SkillRadarProps)
         splitNumber: 4,
         axisName: {
           fontSize: 12,
+          fontWeight: 700,
           color: '#595959',
         },
         splitArea: { areaStyle: { color: ['#fff', '#fafafa'] } },

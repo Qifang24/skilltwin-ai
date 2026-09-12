@@ -1,4 +1,4 @@
-import { Button, Card, Col, Row, Space, Tag, Typography } from 'antd'
+import { Button, Card, Col, Row, Space, Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
 
 import { PageHero } from '@/components/PageHero'
@@ -40,12 +40,11 @@ export function AdminDashboard() {
   ]
 
   return (
-    <Space orientation="vertical" size={24} style={{ width: '100%' }}>
+    <Space className="admin-workspace" orientation="vertical" size={24} style={{ width: '100%' }}>
       <PageHero
-        eyebrow="管理端 · 课程建设与项目验证"
-        title="管理专业建设，验证教学效果"
-        description="为专业负责人、课程负责人和比赛团队提供课程优化与真实试用的辅助工具。"
-        meta={<Tag color="cyan">不属于教师日常备课三步</Tag>}
+        eyebrow={'\u7ba1\u7406\u7aef'}
+        title={'\u4e13\u4e1a\u5efa\u8bbe\u7ba1\u7406'}
+        description={'\u7ba1\u7406\u5c97\u4f4d\u6570\u636e\u3001\u8bfe\u7a0b\u5bf9\u6807\u4e0e\u57f9\u517b\u65b9\u6848\u4f18\u5316\u3002'}
       />
 
       <Card className="admin-tools-panel" title="管理工具" extra={<Text type="secondary">选择需要开展的管理工作</Text>}>

@@ -13,17 +13,19 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
-from sqlalchemy import select  # noqa: E402
+from sqlalchemy import func, select  # noqa: E402
 
 from app.agents.assessment import AssessmentItemAgent, ItemGenerationInput  # noqa: E402
 from app.core.config import DemoMode, settings  # noqa: E402
 from app.core.db import create_all, session_scope  # noqa: E402
 from app.core.enums import GraphStatus, ItemType  # noqa: E402
+from app.core.errors import LLMError  # noqa: E402
 from app.core.llm import build_provider  # noqa: E402
 from app.core.llm_runner import LLMRunner  # noqa: E402
 from app.core.logging import force_utf8_stdio, setup_logging  # noqa: E402
@@ -73,10 +75,19 @@ def main() -> int:
             return 1
 
         target = CompetencyGraphService(db).target_skill_vector(graph)
+        # 支持中断后续跑：已有足够题目的技能不重复出题。
+        existing_counts = dict(
+            db.execute(
+                select(AssessmentItemSkill.skill_code, func.count())
+                .join(AssessmentItem, AssessmentItem.id == AssessmentItemSkill.item_id)
+                .where(AssessmentItem.job_id == args.job)
+                .group_by(AssessmentItemSkill.skill_code)
+            ).all()
+        )
         skills = []
         for code in sorted(target):
             skill = db.get(Skill, code)
-            if skill:
+            if skill and existing_counts.get(code, 0) < args.per_skill:
                 skills.append((code, skill.name_zh, skill.description))
 
         print(f"岗位：{job.name}")
@@ -89,14 +100,30 @@ def main() -> int:
         for start in range(0, len(skills), args.batch):
             group = skills[start : start + args.batch]
             names = "、".join(name for _, name, _ in group)
-            envelope = agent.run(
-                db,
-                ItemGenerationInput(
-                    skills=group,
-                    count=args.per_skill * len(group),
-                    job_name=job.name,
-                ),
-            )
+            envelope = None
+            last_error: LLMError | None = None
+            # 第三方模型偶发返回空 choices 时，重试本批；仍失败则保留已生成题目并继续后续技能。
+            for attempt in range(1, 4):
+                try:
+                    envelope = agent.run(
+                        db,
+                        ItemGenerationInput(
+                            skills=group,
+                            count=args.per_skill * len(group),
+                            job_name=job.name,
+                        ),
+                    )
+                    break
+                except LLMError as exc:
+                    last_error = exc
+                    if attempt < 3:
+                        print(f"  {names[:34]:36s} 调用失败，正在重试（{attempt}/3）")
+                        time.sleep(2 * attempt)
+
+            if envelope is None:
+                rejected.append((names[:24], f"模型调用失败：{last_error}"))
+                print(f"  {names[:34]:36s} 跳过：模型连续 3 次未返回有效结果")
+                continue
 
             accepted = 0
             for item in envelope.result.items:
@@ -164,8 +191,6 @@ def main() -> int:
 
     if not args.dry_run:
         with session_scope() as db:
-            from sqlalchemy import func
-
             rows = db.execute(
                 select(AssessmentItemSkill.skill_code, func.count())
                 .group_by(AssessmentItemSkill.skill_code)

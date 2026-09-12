@@ -2,6 +2,7 @@ import { Alert, Button, Card, Descriptions, Space, Tag, Typography, Upload, mess
 import { InboxOutlined } from '@ant-design/icons'
 import type { UploadProps } from 'antd'
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { PageHero } from '@/components/PageHero'
 import { importJobPostings, toErrorMessage } from '@/services/api'
@@ -36,6 +37,7 @@ function isImportPayload(value: unknown): value is JobPostingImportPayload {
 }
 
 export function JobDataImportPage() {
+  const navigate = useNavigate()
   const [payload, setPayload] = useState<JobPostingImportPayload | null>(null)
   const [fileName, setFileName] = useState('')
   const [importing, setImporting] = useState(false)
@@ -87,12 +89,13 @@ export function JobDataImportPage() {
   }
 
   return (
-    <Space orientation="vertical" size={20} style={{ width: '100%' }}>
+    <Space className="job-data-import-page" orientation="vertical" size={20} style={{ width: '100%' }}>
       <PageHero
         eyebrow="管理端 · 岗位数据治理"
         title="导入可追溯的岗位需求数据"
         description="将公开岗位 JD 导入系统，保留来源与原文证据，自动校验、去重、脱敏并更新岗位技能需求。"
         meta={<Tag color="cyan">单次最多导入 500 条岗位记录</Tag>}
+        actions={<Button type="primary" onClick={() => navigate('/admin')}>{'\u2190 \u8fd4\u56de\u7ba1\u7406\u7aef'}</Button>}
       />
 
       <Card className="job-import-card" title="上传岗位数据" extra={<Button type="link" onClick={downloadTemplate}>下载 JSON 模板</Button>}>

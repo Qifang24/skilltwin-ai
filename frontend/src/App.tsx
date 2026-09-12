@@ -14,6 +14,7 @@ import { AssessmentPage } from '@/pages/AssessmentPage'
 import { AdminDashboard } from '@/pages/AdminDashboard'
 import { JobDataImportPage } from '@/pages/JobDataImportPage'
 import { StudentDashboard } from '@/pages/StudentDashboard'
+import { StudentLearningPathPage } from '@/pages/StudentLearningPathPage'
 import { TrainingTaskDetail } from '@/pages/TrainingTaskDetail'
 import { TrainingTaskLibrary } from '@/pages/TrainingTaskLibrary'
 
@@ -94,7 +95,7 @@ function App() {
 
       <Content className="app-content">
         <main className="app-shell">
-          {backTarget && pathname !== '/teacher/market' && pathname !== '/teacher/graphs' && pathname !== '/teacher/tasks' && (
+          {backTarget && !['/teacher/market', '/teacher/graphs', '/teacher/tasks', '/student/diagnosis', '/student/path', '/admin/job-data'].some((route) => pathname.startsWith(route)) && !pathname.startsWith('/teacher/curriculum-gap') && !pathname.startsWith('/teacher/curriculum-optimization') && (
             <div className="portal-backbar">
               <Button type="text" onClick={returnToPrevious}>← 返回上一步</Button>
             </div>
@@ -113,6 +114,8 @@ function App() {
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/job-data" element={<JobDataImportPage />} />
             <Route path="/student" element={<StudentDashboard />} />
+            <Route path="/student/diagnosis" element={<StudentDashboard />} />
+            <Route path="/student/path" element={<StudentLearningPathPage />} />
             <Route path="/student/tutor" element={<TutorPage />} />
             <Route
               path="/student/tasks/:taskId"
