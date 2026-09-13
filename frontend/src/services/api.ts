@@ -42,6 +42,7 @@ import type {
   JobPostingImportResponse,
 } from '@/types/jobMarket'
 import type { CurriculumGapDashboard, CurriculumOptimization } from '@/types/curriculum'
+import type { CurriculumAnalysis, CurriculumDraftCourse, CurriculumImportBatch, CurriculumPlanDetail, CourseSkillMapping, EvidenceChain, ImportRowState, JobImportBatch, JobImportResult, OptimizationRun, OptimizationSuggestion, ScopeOption } from '@/types/professional'
 import type { TutorReply } from '@/types/tutor'
 import type {
   UserTestOutcome,
@@ -52,6 +53,31 @@ import type {
 } from '@/types/userTesting'
 
 export const API_PREFIX = '/api/v1'
+
+type UnknownRecord = Record<string, unknown>
+interface RawImportRow extends UnknownRecord {
+  row_number?: number
+  status?: string
+  normalized_data?: Record<string, string | number | boolean | null>
+  data?: Record<string, string | number | boolean | null>
+  errors?: string[]
+  warnings?: string[]
+}
+interface RawJobImport extends UnknownRecord {
+  id?: string
+  job_id?: string
+  job_name?: string
+  status?: string
+  headers?: string[]
+  field_mapping?: Record<string, string>
+  mapping?: Record<string, string>
+  total_rows?: number
+  success_count?: number
+  failed_count?: number
+  duplicate_count?: number
+  filtered_count?: number
+  rows?: RawImportRow[]
+}
 
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? '',
@@ -230,10 +256,17 @@ export async function generateTask(
   nodeId: string,
   difficulty: TaskDifficulty = 'beginner',
   context?: string,
+  curriculum?: { planId?: string; courseId?: string },
 ) {
   const { data } = await http.post<TrainingTaskDetail>(
     `${API_PREFIX}/training-tasks/generate`,
-    { node_id: nodeId, difficulty, context },
+    {
+      node_id: nodeId,
+      difficulty,
+      context,
+      ...(curriculum?.planId ? { plan_id: curriculum.planId } : {}),
+      ...(curriculum?.courseId ? { course_id: curriculum.courseId } : {}),
+    },
   )
   return data
 }
@@ -434,6 +467,108 @@ export async function importJobPostings(payload: JobPostingImportPayload) {
   const { data } = await http.post<JobPostingImportResponse>(`${API_PREFIX}/job-market/import`, payload)
   return data
 }
+
+// ==================== 专业建设闭环（批次化导入、对标、优化） ====================
+// Uploads deliberately use FormData; callers can retry each stage without re-uploading.
+export async function createJobImport(file: File, jobId = 'ai_data_annotator', jobName = 'AI 数据标注工程师'): Promise<JobImportBatch> {
+  const form = new FormData(); form.append('file', file); form.append('job_id', jobId); form.append('job_name', jobName)
+  const { data } = await http.post<RawJobImport>(`${API_PREFIX}/job-imports`, form, { headers: { 'Content-Type': undefined } })
+  return normalizeJobImport(data)
+}
+export async function updateJobImportMapping(batchId: string, mapping: Record<string, string>, jobName?: string) {
+  const { data } = await http.patch<RawJobImport>(`${API_PREFIX}/job-imports/${batchId}/mapping`, { mapping, job_name: jobName })
+  return normalizeJobImport(data)
+}
+export async function fetchJobImportPreview(batchId: string) {
+  const { data } = await http.get<RawJobImport>(`${API_PREFIX}/job-imports/${batchId}/preview`)
+  return normalizeJobImport(data)
+}
+export async function confirmJobImport(batchId: string) {
+  const { data } = await http.post<RawJobImport>(`${API_PREFIX}/job-imports/${batchId}/confirm`)
+  const batch = normalizeJobImport(data)
+  return { batch_id: batch.id, job_id: batch.job_id ?? '', job_name: batch.job_name ?? undefined, created: data.success_count ?? 0, updated: 0, skipped_duplicates: data.duplicate_count ?? 0, filtered: data.filtered_count ?? 0, failed: data.failed_count ?? 0, pii_scrubbed: batch.rows?.filter((row) => row.data.pii_scrubbed === true).length ?? 0, rows: batch.rows ?? [], warnings: [] } satisfies JobImportResult
+}
+export async function fetchJobImportResult(batchId: string) {
+  const { data } = await http.get<RawJobImport>(`${API_PREFIX}/job-imports/${batchId}/result`)
+  const batch = normalizeJobImport(data)
+  return { batch_id: batch.id, job_id: batch.job_id ?? '', job_name: batch.job_name ?? undefined, created: data.success_count ?? 0, updated: 0, skipped_duplicates: data.duplicate_count ?? 0, filtered: data.filtered_count ?? 0, failed: data.failed_count ?? 0, pii_scrubbed: 0, rows: batch.rows ?? [], warnings: [] } satisfies JobImportResult
+}
+
+function normalizeJobImport(raw: RawJobImport): JobImportBatch {
+  const rows = (raw.rows ?? []).map((row) => {
+    const state: ImportRowState = row.status === 'invalid' ? 'error' : row.status === 'duplicate' ? 'duplicate' : row.status === 'imported' ? 'imported' : row.warnings?.length ? 'warning' : 'valid'
+    return { row_number: row.row_number ?? 0, state, data: row.normalized_data ?? row.data ?? {}, issues: [...(row.errors ?? []), ...(row.warnings ?? [])].map((message) => ({ message })), dedupe_match_id: null }
+  })
+  return { id: raw.id ?? '', job_id: raw.job_id ?? null, job_name: raw.job_name ?? null, status: raw.status ?? 'unknown', headers: raw.headers ?? [], mapping: raw.field_mapping ?? raw.mapping ?? {}, total_rows: raw.total_rows ?? rows.length, preview_rows: rows, rows }
+}
+export async function fetchJobPostings(jobId: string) {
+  const { data } = await http.get(`${API_PREFIX}/job-market/${jobId}/postings`)
+  return data
+}
+export async function fetchMarketJobs(): Promise<{ id: string; name: string }[]> {
+  const { data } = await http.get<{ id: string; name: string }[]>(`${API_PREFIX}/job-market/jobs`); return data
+}
+
+export async function fetchCurriculumPlans(): Promise<ScopeOption[]> {
+  const { data } = await http.get<ScopeOption[]>(`${API_PREFIX}/curriculum/plans`); return data
+}
+export async function deleteCurriculumPlan(planId: string) {
+  await http.delete(`${API_PREFIX}/curriculum/plans/${planId}`)
+}
+export async function fetchCurriculumPlan(planId: string): Promise<CurriculumPlanDetail> {
+  const [{ data: plan }, { data: courses }] = await Promise.all([http.get(`${API_PREFIX}/curriculum/plans/${planId}`), http.get(`${API_PREFIX}/curriculum/plans/${planId}/courses`)]); return { ...plan, courses }
+}
+function normalizeCurriculumImport(value: unknown): CurriculumImportBatch {
+  const raw = value as UnknownRecord
+  const courses = (Array.isArray(raw.courses) ? raw.courses : []).map((item, index) => {
+    const row = item as UnknownRecord
+    const data = (row.data ?? row) as UnknownRecord
+    return { ...data, id: typeof row.id === 'string' ? row.id : typeof data.id === 'string' ? data.id : `draft-${index + 1}`, evidence: (row.field_evidence ?? row.evidence ?? {}) as CurriculumDraftCourse['evidence'], name: typeof data.name === 'string' ? data.name : '', total_hours: typeof data.total_hours === 'number' ? data.total_hours : null, objectives: typeof data.objectives === 'string' ? data.objectives : null }
+  })
+  return { id: typeof raw.id === 'string' ? raw.id : '', status: typeof raw.status === 'string' ? raw.status : 'unknown', file_name: typeof raw.filename === 'string' ? raw.filename : undefined, plan_id: typeof raw.confirmed_plan_id === 'string' ? raw.confirmed_plan_id : null, plan_name: typeof raw.source_name === 'string' ? raw.source_name : null, warnings: typeof raw.error_message === 'string' ? [raw.error_message] : [], courses }
+}
+export async function createCurriculumImport(file: File, planName?: string): Promise<CurriculumImportBatch> {
+  const form = new FormData(); form.append('file', file); form.append('source_name', planName || file.name)
+  const { data } = await http.post<unknown>(`${API_PREFIX}/curriculum/imports`, form, { headers: { 'Content-Type': undefined } }); return normalizeCurriculumImport(data)
+}
+export async function fetchCurriculumImportPreview(batchId: string) {
+  const { data } = await http.get<unknown>(`${API_PREFIX}/curriculum/imports/${batchId}/preview`); return normalizeCurriculumImport(data)
+}
+export async function retryCurriculumImport(batchId: string) {
+  const { data } = await http.post<unknown>(`${API_PREFIX}/curriculum/imports/${batchId}/retry`); return normalizeCurriculumImport(data)
+}
+export async function confirmCurriculumImport(batchId: string, input?: { plan_id?: string; name?: string }) {
+  const body = { plan_id: input?.plan_id || `plan_${batchId}`, name: input?.name || '导入培养方案', profession: null, version: null, is_partial: false }
+  const { data } = await http.post<{ id: string }>(`${API_PREFIX}/curriculum/imports/${batchId}/confirm`, body); return fetchCurriculumPlan(data.id)
+}
+export async function createCurriculumAnalysis(payload: { job_id: string; plan_id: string; graph_id: string }) {
+  const { data } = await http.post<CurriculumAnalysis>(`${API_PREFIX}/curriculum/analyses`, payload); return data
+}
+export async function fetchCurriculumAnalysis(params: { job_id: string; plan_id: string; graph_id: string }) {
+  const { data } = await http.get<unknown>(`${API_PREFIX}/curriculum/analyses`, { params }); return normalizeAnalysis(data)
+}
+function normalizeAnalysis(value: unknown): CurriculumAnalysis { return value as CurriculumAnalysis }
+function normalizeRun(value: unknown): OptimizationRun { return value as OptimizationRun }
+export async function createCourseSkillMapping(courseId: string, payload: Partial<CourseSkillMapping>) {
+  const { data } = await http.post<CourseSkillMapping>(`${API_PREFIX}/curriculum/courses/${courseId}/skills`, { evidence_quote: '', ...payload }); return data
+}
+export async function updateCourseSkillMapping(mappingId: string, payload: Partial<CourseSkillMapping>) {
+  const { data } = await http.patch<CourseSkillMapping>(`${API_PREFIX}/curriculum/skill-mappings/${mappingId}`, { evidence_quote: '', ...payload }); return data
+}
+export async function deleteCourseSkillMapping(mappingId: string) { await http.delete(`${API_PREFIX}/curriculum/skill-mappings/${mappingId}`) }
+export async function fetchSkillEvidence(params: { job_id: string; plan_id: string; graph_id: string; skill_code: string }) {
+  const { data } = await http.get<EvidenceChain>(`${API_PREFIX}/curriculum/evidence`, { params }); return data
+}
+export async function generateOptimization(payload: { job_id: string; plan_id: string; graph_id: string }) {
+  const { data } = await http.post<unknown>(`${API_PREFIX}/curriculum/optimization-runs`, payload); return normalizeRun(data)
+}
+export async function fetchOptimizationRun(params: { job_id: string; plan_id: string; graph_id: string }) {
+  const { data } = await http.get<unknown>(`${API_PREFIX}/curriculum/optimization-runs/latest`, { params }); return normalizeRun(data)
+}
+export async function updateOptimizationSuggestion(id: string, payload: Partial<Pick<OptimizationSuggestion, 'title' | 'suggestion' | 'action_type' | 'state' | 'teacher_note'>>) {
+  const { data } = await http.patch<OptimizationSuggestion>(`${API_PREFIX}/curriculum/optimization-suggestions/${id}`, payload); return data
+}
+export function optimizationReportUrl(runId: string) { return `${http.defaults.baseURL}${API_PREFIX}/curriculum/optimization-runs/${runId}/report.docx` }
 
 export async function deleteGraph(graphId: string) {
   await http.delete(`${API_PREFIX}/graphs/${graphId}`)

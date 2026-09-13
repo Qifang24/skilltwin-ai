@@ -40,6 +40,10 @@ _PROMPT = """请为以下岗位能力设计一个实训任务。
 本单元包含的技能点：
 {skill_lines}
 
+## 已选培养方案/课程
+
+{curriculum_context}
+
 ## 可用依据
 
 {context}
@@ -68,6 +72,9 @@ _PROMPT = """请为以下岗位能力设计一个实训任务。
    写「标注准确率≥95%」而不是「标注质量好」。
 5. **常见错误要来自真实作业经验**，说明错在哪、会造成什么后果、怎么改。
 6. 若涉及数据安全、隐私或作业规范，写入 `safety_notes`。
+7. 若上方提供了具体课程，任务应把该课程已有的教学内容转化为可实施的
+   教学任务，并优先训练“课程技能覆盖”与目标能力单元共同包含的技能；
+   不要编造课程原文中不存在的课程要求。
 
 ## 输出格式
 
@@ -115,6 +122,8 @@ class TaskGenerationInput:
     skills: list[tuple[str, str, int | None]] = field(default_factory=list)
     difficulty: TaskDifficulty = TaskDifficulty.BEGINNER
     context: str | None = None
+    #: 由课程服务根据已导入原文与 CourseSkillCoverage 构造，不能来自前端自由文本。
+    curriculum_context: str | None = None
 
 
 class TrainingTaskAgent(BaseAgent[TaskGenerationInput, TrainingTaskDraft]):
@@ -127,6 +136,8 @@ class TrainingTaskAgent(BaseAgent[TaskGenerationInput, TrainingTaskDraft]):
     def retrieval_query(self, inp: TaskGenerationInput) -> str:
         skill_names = " ".join(name for _, name, _ in inp.skills[:4])
         base = f"{inp.unit_name} {skill_names} 实训 操作规范 教学要求"
+        if inp.curriculum_context:
+            base = f"{base} {inp.curriculum_context[:300]}"
         return f"{base} {inp.context}" if inp.context else base
 
     def render_prompt(
@@ -163,6 +174,7 @@ class TrainingTaskAgent(BaseAgent[TaskGenerationInput, TrainingTaskDraft]):
                     unit_name=inp.unit_name,
                     unit_description=description,
                     skill_lines=skill_lines,
+                    curriculum_context=inp.curriculum_context or "（未指定培养方案或课程，沿用原有按能力节点生成方式。）",
                     context=context,
                     difficulty_guide=_DIFFICULTY_GUIDE[inp.difficulty],
                     difficulty_value=inp.difficulty.value,
@@ -177,6 +189,7 @@ class TrainingTaskAgent(BaseAgent[TaskGenerationInput, TrainingTaskDraft]):
             "skills": [code for code, _, _ in inp.skills],
             "difficulty": inp.difficulty.value,
             "context": inp.context,
+            "has_curriculum_context": bool(inp.curriculum_context),
         }
 
     def reasoning_summary(

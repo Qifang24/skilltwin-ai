@@ -12,6 +12,7 @@ import {
   Button,
   Card,
   Col,
+  Collapse,
   Descriptions,
   Form,
   Input,
@@ -38,7 +39,22 @@ import {
   TASK_STATUS_COLORS,
   TASK_STATUS_LABELS,
 } from '@/types/training'
-import type { RubricDimension } from '@/types/training'
+
+const COURSE_EVIDENCE_FIELD_LABELS: Record<string, string> = {
+  source_quote: '课程原文',
+  course_code: '课程代码',
+  name: '课程名称',
+  category: '课程类别',
+  total_hours: '课程学时',
+  objectives: '课程目标',
+  description: '课程简介',
+  teaching_content: '教学内容',
+  knowledge_points: '知识点',
+  practical_content: '实践内容',
+  learning_outcomes: '学习成果',
+  id: '课程记录编号',
+}
+import type { RubricDimension, TaskCourseEvidence } from '@/types/training'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -267,7 +283,38 @@ export function TrainingTaskDetail({ audience = 'teacher' }: TrainingTaskDetailP
             <Text type="warning">{weightTotal}%（通常应为 100）</Text>
           )}
         </Descriptions.Item>
+        {data.curriculum_plan && <Descriptions.Item label="关联培养方案">{data.curriculum_plan.name}</Descriptions.Item>}
+        {data.curriculum_course && <Descriptions.Item label="关联课程">{data.curriculum_course.name}</Descriptions.Item>}
       </Descriptions>
+
+      {(data.curriculum_plan || data.curriculum_course) && (
+        <Card className="task-detail-card task-detail-card--curriculum" title="课程依据" size="small">
+          <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+            {data.curriculum_plan && <Text><Text type="secondary">培养方案：</Text>{data.curriculum_plan.name}{data.curriculum_plan.version ? ` · ${data.curriculum_plan.version}` : ''}</Text>}
+            {data.curriculum_course && <>
+              <Text><Text type="secondary">课程：</Text>{data.curriculum_course.name}{data.curriculum_course.total_hours ? ` · ${data.curriculum_course.total_hours} 学时` : ''}</Text>
+              {data.curriculum_course.objectives && <Text type="secondary">课程目标：{data.curriculum_course.objectives}</Text>}
+            </>}
+            {(data.course_evidence ?? []).length > 0 ? <Collapse
+              size="small"
+              items={[{
+                key: 'course-evidence',
+                label: `查看生成时固化的 ${data.course_evidence?.length ?? 0} 条课程依据`,
+                children: <List
+                  size="small"
+                  dataSource={data.course_evidence}
+                  renderItem={(item: TaskCourseEvidence) => <List.Item>
+                    <Space orientation="vertical" size={2} style={{ width: '100%' }}>
+                      <Text type="secondary" style={{ fontSize: 12 }}>{item.skill_code ? `课程—技能映射 · ${item.skill_code}` : item.field ? `课程材料 · ${COURSE_EVIDENCE_FIELD_LABELS[item.field] ?? item.field}` : '课程材料原文'}{item.page ? ` · 第${item.page}页` : ''}</Text>
+                      <Text>“{item.quote}”</Text>
+                    </Space>
+                  </List.Item>}
+                />,
+              }]}
+            /> : <Text type="secondary">已关联课程上下文；原始材料未提供可展示的连续引文。</Text>}
+          </Space>
+        </Card>
+      )}
 
       <Card className="task-detail-card task-detail-card--scenario" title="工作情境" size="small">
         <Paragraph style={{ marginBottom: 0 }}>{data.scenario}</Paragraph>

@@ -233,6 +233,7 @@ export function GraphReview() {
         <Col xs={24} lg={24}>
           <Card className="graph-node-detail-card" title="节点详情与依据" style={{ minHeight: 400 }}>
             <NodeDetailPanel
+              key={selected?.id ?? 'no-node-selected'}
               graphId={graphId}
               node={selected}
               editable={isDraft}

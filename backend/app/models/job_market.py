@@ -19,6 +19,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     JSON,
     DateTime,
     Float,
@@ -50,6 +51,7 @@ class JobPosting(Base, TimestampMixin):
     )
 
     title: Mapped[str] = mapped_column(String(255), nullable=False)
+    company_name: Mapped[str | None] = mapped_column(String(255))
     company_type: Mapped[str | None] = mapped_column(String(128))
     city: Mapped[str | None] = mapped_column(String(64))
 
@@ -80,6 +82,12 @@ class JobPosting(Base, TimestampMixin):
     #: 导入时是否执行过联系方式脱敏
     pii_scrubbed: Mapped[bool] = mapped_column(default=False, nullable=False)
 
+    import_batch_id: Mapped[str | None] = mapped_column(
+        ForeignKey("job_import_batch.id", ondelete="SET NULL")
+    )
+    source_record_id: Mapped[str | None] = mapped_column(String(255))
+    dedupe_hash: Mapped[str | None] = mapped_column(String(64))
+
     extra: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
 
     skills: Mapped[list["JobPostingSkill"]] = relationship(
@@ -89,10 +97,77 @@ class JobPosting(Base, TimestampMixin):
     __table_args__ = (
         Index("ix_posting_job_flag", "job_id", "data_flag"),
         Index("ix_posting_collected", "collected_at"),
+        Index("ix_posting_dedupe_hash", "dedupe_hash"),
     )
 
     def __repr__(self) -> str:
         return f"<JobPosting {self.id} {self.title} [{self.data_flag}]>"
+
+
+class JobImportBatch(Base, TimestampMixin):
+    """A staged import. Rows do not become postings until confirm succeeds."""
+
+    __tablename__ = "job_import_batch"
+
+    id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    job_id: Mapped[str] = mapped_column(String(96), nullable=False)
+    job_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="uploaded", nullable=False)
+    field_mapping: Mapped[dict[str, str]] = mapped_column(JSON, default=dict, nullable=False)
+    headers: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    total_rows: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    success_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    failed_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    duplicate_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    filtered_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    result: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+
+
+class JobImportRow(Base, TimestampMixin):
+    __tablename__ = "job_import_row"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    batch_id: Mapped[str] = mapped_column(
+        ForeignKey("job_import_batch.id", ondelete="CASCADE"), nullable=False
+    )
+    row_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    raw_data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    normalized_data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False)
+    errors: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    warnings: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    dedupe_hash: Mapped[str | None] = mapped_column(String(64))
+    posting_id: Mapped[str | None] = mapped_column(String(96))
+
+    __table_args__ = (
+        UniqueConstraint("batch_id", "row_number", name="uq_job_import_row_number"),
+        Index("ix_job_import_row_batch_status", "batch_id", "status"),
+    )
+
+
+class JobSkillCandidate(Base, TimestampMixin):
+    """Unknown terms are quarantined here; they never enter canonical Skill automatically."""
+
+    __tablename__ = "job_skill_candidate"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    posting_id: Mapped[str] = mapped_column(
+        ForeignKey("job_posting.id", ondelete="CASCADE"), nullable=False
+    )
+    candidate_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    evidence_span: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False)
+    reviewed_skill_code: Mapped[str | None] = mapped_column(
+        ForeignKey("skill.skill_code", ondelete="SET NULL")
+    )
+    reviewed_by: Mapped[str | None] = mapped_column(String(128))
+
+    __table_args__ = (
+        UniqueConstraint("posting_id", "candidate_name", name="uq_job_skill_candidate"),
+    )
 
 
 class JobPostingSkill(Base, TimestampMixin):

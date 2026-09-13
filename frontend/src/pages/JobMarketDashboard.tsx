@@ -1,19 +1,18 @@
 /** 教师端岗位市场看板：JD 原文 → 可验证统计 → 排名与趋势。 */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import dayjs from 'dayjs'
 import { App, Alert, Button, Card, Checkbox, Col, DatePicker, Empty, Input, Popover, Row, Space, Statistic, Table, Tag, Typography } from 'antd'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import ReactECharts from 'echarts-for-react'
 import type { EChartsOption } from 'echarts'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { analyzeJobMarket, fetchJobMarketDashboard, toErrorMessage } from '@/services/api'
 import type { DemandEvidence, SkillDemand } from '@/types/jobMarket'
 
 const { Title, Paragraph, Text } = Typography
 
-const TARGET_JOB = 'ai_data_annotator'
 const CATEGORY_LABELS: Record<string, string> = {
   annotation: '数据标注',
   data: '数据处理',
@@ -73,17 +72,20 @@ function EvidencePopover({ evidence }: { evidence: DemandEvidence[] }) {
 export function JobMarketDashboard() {
   const { message } = App.useApp()
   const navigate = useNavigate()
+  const [search] = useSearchParams()
+  const jobId = search.get('job_id') ?? ''
   const queryClient = useQueryClient()
   const [draftFilters, setDraftFilters] = useState<MarketFilters>({})
   const [filters, setFilters] = useState<MarketFilters>({})
   const dashboardQuery = useQuery({
-    queryKey: ['job-market-dashboard', TARGET_JOB, filters],
-    queryFn: () => fetchJobMarketDashboard(TARGET_JOB, { top_n: 10, ...filters }),
+    queryKey: ['job-market-dashboard', jobId, filters],
+    queryFn: () => fetchJobMarketDashboard(jobId, { top_n: 10, ...filters }),
+    enabled: Boolean(jobId),
   })
   const analyze = useMutation({
-    mutationFn: () => analyzeJobMarket(TARGET_JOB),
+    mutationFn: () => analyzeJobMarket(jobId),
     onSuccess: (response) => {
-      queryClient.setQueryData(['job-market-dashboard', TARGET_JOB], response.dashboard)
+      queryClient.setQueriesData({ queryKey: ['job-market-dashboard', jobId] }, response.dashboard)
       message.success(`统计已更新：${response.extracted_skill_links} 个原文技能命中`)
     },
     onError: (error) => message.error(toErrorMessage(error)),
@@ -98,13 +100,10 @@ export function JobMarketDashboard() {
   const focusSkills = (dashboard?.ranking ?? [])
     .filter((item) => item.real_posting_count > 0 || item.posting_count > 0)
     .slice(0, 3)
-  useEffect(() => {
-    if (selectedSkillCodes === null && focusSkills.length > 0) {
-      setSelectedSkillCodes(focusSkills.map((skill) => skill.skill_code))
-    }
-  }, [focusSkills, selectedSkillCodes])
+  const defaultSkillCodes = focusSkills.map((skill) => skill.skill_code)
+  const effectiveSkillCodes = selectedSkillCodes ?? defaultSkillCodes
   const selectedSkills = (dashboard?.ranking ?? []).filter((skill) =>
-    (selectedSkillCodes ?? []).includes(skill.skill_code),
+    effectiveSkillCodes.includes(skill.skill_code),
   )
   const graphFocus = [
     selectedSkills.length > 0 ? `优先围绕以下岗位能力构建图谱：${selectedSkills.map((skill) => skill.skill_name ?? skill.skill_code).join('、')}。` : '',
@@ -226,6 +225,10 @@ export function JobMarketDashboard() {
         </Paragraph>
       </div>
 
+      {!jobId ? <Empty description="请先从岗位数据导入完成页进入，或在地址中提供 job_id。" image={Empty.PRESENTED_IMAGE_SIMPLE}><Button type="primary" onClick={() => navigate('/admin/job-data')}>导入岗位数据</Button></Empty> : null}
+
+      {jobId ? <>
+
       <Card
         size="small"
         className="market-filter-panel"
@@ -306,9 +309,9 @@ export function JobMarketDashboard() {
                       <div className="market-priority-block"><span>优先级</span><b>0{index + 1}</b></div>
                       <div className="market-recommendation__skill-copy">
                         <Checkbox
-                          checked={(selectedSkillCodes ?? []).includes(skill.skill_code)}
+                          checked={effectiveSkillCodes.includes(skill.skill_code)}
                           onChange={(event) => setSelectedSkillCodes((current) => {
-                            const selected = current ?? []
+                            const selected = current ?? defaultSkillCodes
                             return event.target.checked
                               ? [...selected, skill.skill_code]
                               : selected.filter((code) => code !== skill.skill_code)
@@ -370,7 +373,7 @@ export function JobMarketDashboard() {
                   size="middle"
                   loading={dashboardQuery.isLoading}
                   rowSelection={{
-                    selectedRowKeys: selectedSkillCodes ?? [],
+                    selectedRowKeys: effectiveSkillCodes,
                     onChange: (keys) => setSelectedSkillCodes(keys.map(String)),
                     columnTitle: '纳入图谱',
                     columnWidth: 106,
@@ -386,6 +389,7 @@ export function JobMarketDashboard() {
           )}
         </>
       ) : null}
+      </> : null}
     </Space>
   )
 }

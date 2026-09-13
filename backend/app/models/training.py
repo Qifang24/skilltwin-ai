@@ -44,6 +44,14 @@ class TrainingTask(Base, TimestampMixin):
     source_node_id: Mapped[str | None] = mapped_column(
         ForeignKey("competency_node.id", ondelete="SET NULL")
     )
+    #: 可选的培养方案与课程来源。旧任务可以为空；一旦教师从培养方案
+    #: 发起生成，就把选择保存为稳定外键，避免只在 prompt 中出现而无法追溯。
+    plan_id: Mapped[str | None] = mapped_column(
+        ForeignKey("curriculum_plan.id", ondelete="RESTRICT")
+    )
+    course_id: Mapped[str | None] = mapped_column(
+        ForeignKey("curriculum_course.id", ondelete="RESTRICT")
+    )
 
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     #: 工作情境：把学生放进真实岗位场景，而不是「请完成以下练习」
@@ -105,6 +113,8 @@ class TrainingTask(Base, TimestampMixin):
     __table_args__ = (
         Index("ix_task_job_status", "job_id", "status"),
         Index("ix_task_source_node", "source_node_id"),
+        Index("ix_task_plan", "plan_id"),
+        Index("ix_task_course", "course_id"),
     )
 
     def __repr__(self) -> str:

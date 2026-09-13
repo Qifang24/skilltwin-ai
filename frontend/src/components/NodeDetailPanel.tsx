@@ -19,13 +19,12 @@ import {
   Typography,
 } from 'antd'
 import { DeleteOutlined } from '@ant-design/icons'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { useNavigate } from 'react-router-dom'
 
 import {
   deleteGraphNode,
-  generateTask,
   linkGraphNodeJobEvidence,
   toErrorMessage,
   updateGraphNode,
@@ -53,22 +52,9 @@ export function NodeDetailPanel({
 }: NodeDetailPanelProps) {
   const { message } = App.useApp()
   const navigate = useNavigate()
-  const [generating, setGenerating] = useState(false)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
-
-  useEffect(() => {
-    setEditing(false)
-    if (node) {
-      form.setFieldsValue({
-        name: node.name,
-        description: node.description ?? '',
-        teacher_note: node.teacher_note ?? '',
-        mastery_level: node.mastery_level ?? undefined,
-      })
-    }
-  }, [node, form])
 
   if (!node) {
     return (
@@ -97,20 +83,6 @@ export function NodeDetailPanel({
       message.error(toErrorMessage(error))
     } finally {
       setSaving(false)
-    }
-  }
-
-  const handleGenerateTask = async () => {
-    if (!node) return
-    setGenerating(true)
-    try {
-      const task = await generateTask(node.id)
-      message.success('实训任务已生成')
-      navigate(`/teacher/tasks/${task.id}`)
-    } catch (error) {
-      message.error(toErrorMessage(error))
-    } finally {
-      setGenerating(false)
     }
   }
 
@@ -153,7 +125,12 @@ export function NodeDetailPanel({
       </Space>
 
       {editing ? (
-        <Form form={form} layout="vertical" size="small">
+        <Form form={form} layout="vertical" size="small" initialValues={{
+          name: node.name,
+          description: node.description ?? '',
+          teacher_note: node.teacher_note ?? '',
+          mastery_level: node.mastery_level ?? undefined,
+        }}>
           <Form.Item
             name="name"
             label="名称"
@@ -239,10 +216,9 @@ export function NodeDetailPanel({
         <Button
           type="primary"
           block
-          loading={generating}
-          onClick={handleGenerateTask}
+          onClick={() => navigate(`/teacher/tasks?graph_id=${encodeURIComponent(graphId)}&node_id=${encodeURIComponent(node.id)}`)}
         >
-          {generating ? '生成中（约 1 分钟）…' : '由此能力生成实训任务'}
+          选择课程并生成实训任务
         </Button>
       )}
 

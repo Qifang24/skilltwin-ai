@@ -1,27 +1,35 @@
-import { Alert, Button, Card, Empty, List, Space, Tag, Typography } from 'antd'
-import { useQuery } from '@tanstack/react-query'
+import { Alert, Button, Card, Drawer, Empty, Form, Input, Modal, Segmented, Select, Space, Tag, Typography, message } from 'antd'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-
 import { PageHero } from '@/components/PageHero'
-import { fetchCurriculumOptimization, toErrorMessage } from '@/services/api'
+import { ProfessionalScopeBar } from '@/components/ProfessionalScopeBar'
+import { useProfessionalScope } from '@/hooks/useProfessionalScope'
+import { fetchOptimizationRun, generateOptimization, optimizationReportUrl, toErrorMessage, updateOptimizationSuggestion } from '@/services/api'
+import type { OptimizationSuggestion, SuggestionState } from '@/types/professional'
+import { filterSuggestions, nextSuggestionState } from '@/utils/professional'
+import { coveragePresentation } from '@/utils/professional'
 
-const { Text } = Typography
+const { Text, Paragraph } = Typography
+const stateColor: Record<SuggestionState, string> = { pending: 'blue', adopted: 'green', ignored: 'default' }
+const priorityLabels = { high: '高', medium: '中', low: '低' } as const
+const actionLabels: Record<string, string> = { add_course: '新增课程', adjust_course_objectives: '调整课程目标', add_teaching_content: '增加教学内容', add_practicum: '增加实训', add_project_practice: '增加项目实践', adjust_hours: '调整课时', strengthen_competency: '强化某项能力', modify_course_content: '修改现有课程内容' }
+const actionOptions = Object.entries(actionLabels).map(([value, label]) => ({ value, label }))
 export function CurriculumOptimization() {
-  const navigate = useNavigate()
-  const query = useQuery({ queryKey: ['curriculum-optimization', 'ai_data_annotator'], queryFn: () => fetchCurriculumOptimization('ai_data_annotator') })
-  const data = query.data
-  return <Space className="curriculum-page" orientation="vertical" size={24} style={{ width: '100%' }}>
-    <PageHero
-      eyebrow={'\u57f9\u517b\u65b9\u6848\u4f18\u5316'}
-      title={'\u57f9\u517b\u65b9\u6848\u4f18\u5316\u5efa\u8bae'}
-      description={'\u57fa\u4e8e\u5c97\u4f4d\u9700\u6c42\u4e0e\u8bfe\u7a0b\u8986\u76d6\u7f3a\u53e3\u751f\u6210\u4f18\u5316\u5efa\u8bae\u3002'}
-      actions={<Button type="primary" onClick={() => navigate('/admin')}>{'\u2190 \u8fd4\u56de\u7ba1\u7406\u7aef'}</Button>}
-    />
-    {query.isError ? <Alert type="error" showIcon title="无法读取优化建议" description={toErrorMessage(query.error)} /> : null}
-    {data ? <>{data.warnings.map((warning) => <Alert key={warning} type="warning" showIcon title={warning} />)}
-      <Card title="建议优先级">
-        {data.recommendations.length ? <List dataSource={data.recommendations} renderItem={(item) => <List.Item><List.Item.Meta title={<Space><Text strong>{item.title}</Text><Tag color="red">优先级 {item.priority_score}</Tag></Space>} description={<Space orientation="vertical" size={4}><Text>{item.suggestion}</Text><Text type="secondary">{item.reasoning_summary}</Text>{item.course_evidence.map((e) => <Text key={e.course_id} type="secondary">课程证据：{e.course_name} · “{e.evidence_quote}”</Text>)}</Space>} /></List.Item>} /> : <Empty description="当前没有可排序的优化建议" />}
-      </Card>
-    </> : null}
+  const navigate = useNavigate(); const client = useQueryClient(); const [scope] = useProfessionalScope(); const [filter, setFilter] = useState<'all' | SuggestionState>('all'); const [selected, setSelected] = useState<OptimizationSuggestion | null>(null); const [editing, setEditing] = useState<OptimizationSuggestion | null>(null); const [form] = Form.useForm(); const ready = Boolean(scope.jobId && scope.planId && scope.graphId)
+  const run = useQuery({ queryKey: ['optimization-run', scope], queryFn: () => fetchOptimizationRun({ job_id: scope.jobId, plan_id: scope.planId, graph_id: scope.graphId }), enabled: ready, retry: false })
+  const generate = useMutation({ mutationFn: () => generateOptimization({ job_id: scope.jobId, plan_id: scope.planId, graph_id: scope.graphId }), onSuccess: () => { void client.invalidateQueries({ queryKey: ['optimization-run'] }); message.success('已按确定性优先级规则生成建议') }, onError: (e) => message.error(toErrorMessage(e)) })
+  const update = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Parameters<typeof updateOptimizationSuggestion>[1] }) => updateOptimizationSuggestion(id, payload), onSuccess: () => { setEditing(null); void client.invalidateQueries({ queryKey: ['optimization-run'] }); message.success('建议已保存') }, onError: (e) => message.error(toErrorMessage(e)) })
+  const list = useMemo(() => filterSuggestions(run.data?.suggestions ?? [], filter), [run.data?.suggestions, filter])
+  const edit = (item: OptimizationSuggestion) => { setEditing(item); form.setFieldsValue({ title: item.title, suggestion: item.suggestion, action_type: item.action_type, teacher_note: item.teacher_note }) }
+  return <Space className="curriculum-page" orientation="vertical" size={18} style={{ width: '100%' }}>
+    <PageHero eyebrow="培养方案优化" title="可追溯的课程优化建议" description="优先级由岗位频率、岗位出现数、图谱掌握度和覆盖缺口确定；建议以可编辑的结构化草案保存。" actions={<Button onClick={() => navigate('/admin')}>← 返回管理端</Button>} />
+    <ProfessionalScopeBar />
+    {!ready ? <Empty description="选择岗位、培养方案和已审核图谱后生成建议" /> : null}
+    {run.isError ? <Alert type="warning" showIcon title="当前没有可用的优化运行" description={toErrorMessage(run.error)} action={<Button size="small" onClick={() => run.refetch()}>重试</Button>} /> : null}
+    {ready ? <Card title="优化运行" extra={<Space>{run.data ? <Button href={optimizationReportUrl(run.data.id)}>导出 DOCX 报告</Button> : null}<Button type="primary" loading={generate.isPending} onClick={() => generate.mutate()}>{run.data ? '重新生成建议' : '生成优化建议'}</Button></Space>}>{run.data?.low_sample ? <Alert type="warning" showIcon title="真实岗位样本少于 30 条：结果仅供探索性参考" /> : null}{run.data?.status === 'stale' ? <Alert type="warning" showIcon title="上游岗位、图谱或课程已变化；此历史运行已过期，不会覆盖教师决定。" /> : null}{run.data?.warnings.map((warning) => <Alert key={warning} type="warning" showIcon title={warning} />)}</Card> : null}
+    {run.data ? <Card title="建议清单" extra={<Segmented value={filter} onChange={(value) => setFilter(value as 'all' | SuggestionState)} options={[{ label: '全部', value: 'all' }, { label: '待处理', value: 'pending' }, { label: '已采纳', value: 'adopted' }, { label: '已忽略', value: 'ignored' }]} />}>{list.length ? <Space orientation="vertical" size="middle" style={{ width: '100%' }}>{list.map((item) => { const coverage = coveragePresentation(item.coverage_status); return <Card key={item.id} size="small" title={<Space wrap><Text strong>{item.title}</Text><Tag color={item.priority === 'high' ? 'red' : item.priority === 'medium' ? 'orange' : 'blue'}>{priorityLabels[item.priority]} · {item.priority_score.toFixed(1)}</Tag><Tag color={coverage.color}>{coverage.label}</Tag><Tag color={item.ai_generated ? 'purple' : 'default'}>{item.ai_generated ? 'AI 起草' : '规则模板'}</Tag><Tag color={stateColor[item.state]}>{item.state === 'pending' ? '待处理' : item.state === 'adopted' ? '已采纳' : '已忽略'}</Tag></Space>} extra={<Space><Button type="link" onClick={() => setSelected(item)}>证据</Button><Button type="link" onClick={() => edit(item)}>编辑</Button>{item.state !== 'adopted' ? <Button type="link" onClick={() => update.mutate({ id: item.id, payload: { state: nextSuggestionState('adopt') } })}>采纳</Button> : null}{item.state !== 'ignored' ? <Button danger type="link" onClick={() => update.mutate({ id: item.id, payload: { state: nextSuggestionState('ignore') } })}>忽略</Button> : null}</Space>}><Space orientation="vertical" size={4}><Text>{item.suggestion}</Text><Text type="secondary">建议类型：{actionLabels[item.action_type] ?? item.action_type} · 技能：{item.skill_name ?? item.skill_code}</Text><Text type="secondary">涉及课程：{item.affected_courses.join('、') || '暂无对应课程，建议新增或嵌入现有课程'}</Text><Text type="secondary">生成依据：{item.generation_reason}</Text>{item.teacher_note ? <Text type="secondary">教师备注：{item.teacher_note}</Text> : null}</Space></Card>})}</Space> : <Empty description="当前筛选下没有建议" />}</Card> : null}
+    <Drawer title="建议证据链" open={Boolean(selected)} size="large" onClose={() => setSelected(null)}>{selected ? <Space orientation="vertical" style={{ width: '100%' }}><Text strong>{selected.skill_name ?? selected.skill_code}</Text><Alert type="info" title={selected.generation_reason} /><Card size="small" title="岗位 JD 原文">{selected.evidence.job_evidence.map((item, i) => <Paragraph key={i}><Text strong>{item.title}</Text>：“{item.quote}”</Paragraph>)}</Card>{selected.evidence.graph_evidence ? <Card size="small" title="已审核图谱">{selected.evidence.graph_evidence.node_name} · 掌握度 {selected.evidence.graph_evidence.mastery_level ?? '—'}</Card> : null}<Card size="small" title="课程原文">{selected.evidence.course_evidence.length ? selected.evidence.course_evidence.map((item, i) => <Paragraph key={i}><Text strong>{item.course_name}</Text>：“{item.quote}”<br /><Text type="secondary">页码 {item.page ?? '—'} · chunk {item.chunk_id ?? '—'}</Text></Paragraph>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前没有对应课程原文，这正是未覆盖缺口" />}</Card></Space> : null}</Drawer>
+    <Modal title="编辑优化建议" open={Boolean(editing)} onCancel={() => setEditing(null)} confirmLoading={update.isPending} onOk={() => form.validateFields().then((values) => editing && update.mutate({ id: editing.id, payload: values })).catch(() => undefined)}><Form form={form} layout="vertical"><Form.Item name="title" label="建议标题" rules={[{ required: true }]}><Input /></Form.Item><Form.Item name="action_type" label="建议类型" rules={[{ required: true }]}><Select options={actionOptions} /></Form.Item><Form.Item name="suggestion" label="建议内容" rules={[{ required: true }]}><Input.TextArea rows={5} /></Form.Item><Form.Item name="teacher_note" label="教师备注"><Input.TextArea rows={3} /></Form.Item></Form></Modal>
   </Space>
 }

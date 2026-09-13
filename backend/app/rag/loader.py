@@ -116,7 +116,14 @@ def _load_docx(path: Path) -> list[LoadedPage]:
     import docx
 
     document = docx.Document(str(path))
-    text = "\n".join(p.text for p in document.paragraphs)
+    parts = [p.text for p in document.paragraphs if p.text.strip()]
+    # 培养方案的课程清单和学时经常只存在于表格中，遗漏表格会制造假缺口。
+    for table in document.tables:
+        for row in table.rows:
+            values = [cell.text.strip() for cell in row.cells]
+            if any(values):
+                parts.append("\t".join(values))
+    text = "\n".join(parts)
     return [LoadedPage(page_index=1, printed_page=None, text=text)]
 
 

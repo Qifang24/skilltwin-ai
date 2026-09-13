@@ -1,10 +1,10 @@
 import { Alert, App, Button, Card, Progress, Select, Space, Table, Tag, Typography } from 'antd'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { PageHero } from '@/components/PageHero'
-import { fetchGraph, fetchGraphs, fetchTasks, generateTask, toErrorMessage } from '@/services/api'
+import { fetchCurriculumPlan, fetchCurriculumPlans, fetchGraph, fetchGraphs, fetchTasks, generateTask, toErrorMessage } from '@/services/api'
 import type { GraphNode } from '@/types/graph'
 import {
   DIFFICULTY_COLORS,
@@ -23,12 +23,18 @@ function flatten(nodes: GraphNode[]): GraphNode[] {
 /** STEP 03：查看、发布和管理从已审核图谱生成的实训任务。 */
 export function TrainingTaskLibrary() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { message } = App.useApp()
-  const [selectedUnitId, setSelectedUnitId] = useState<string | undefined>()
+  const requestedGraphId = searchParams.get('graph_id')
+  const requestedNodeId = searchParams.get('node_id')
+  const [selectedUnitId, setSelectedUnitId] = useState<string | undefined>(() => requestedNodeId ?? undefined)
+  const [selectedPlanId, setSelectedPlanId] = useState<string | undefined>(() => searchParams.get('plan_id') ?? undefined)
+  const [selectedCourseId, setSelectedCourseId] = useState<string | undefined>(() => searchParams.get('course_id') ?? undefined)
   const [generationProgress, setGenerationProgress] = useState(0)
   const tasksQuery = useQuery({ queryKey: ['tasks'], queryFn: () => fetchTasks() })
   const graphsQuery = useQuery({ queryKey: ['graphs'], queryFn: () => fetchGraphs() })
-  const approvedGraph = graphsQuery.data?.items.find((graph) => graph.status === 'approved')
+  const approvedGraph = graphsQuery.data?.items.find((graph) => graph.id === requestedGraphId && graph.status === 'approved')
+    ?? graphsQuery.data?.items.find((graph) => graph.status === 'approved')
   const graphQuery = useQuery({
     queryKey: ['task-generator-graph', approvedGraph?.id],
     queryFn: () => fetchGraph(approvedGraph!.id),
@@ -38,27 +44,40 @@ export function TrainingTaskLibrary() {
     () => (graphQuery.data ? flatten(graphQuery.data.tree).filter((node) => node.node_type === 'competency_unit') : []),
     [graphQuery.data],
   )
+  const plansQuery = useQuery({ queryKey: ['curriculum-plans'], queryFn: fetchCurriculumPlans })
+  const planQuery = useQuery({
+    queryKey: ['task-generator-plan', selectedPlanId],
+    queryFn: () => fetchCurriculumPlan(selectedPlanId!),
+    enabled: Boolean(selectedPlanId),
+  })
   const createTask = useMutation({
-    mutationFn: (nodeId: string) => generateTask(nodeId),
+    mutationFn: (nodeId: string) => generateTask(nodeId, 'beginner', undefined, {
+      planId: selectedPlanId,
+      courseId: selectedCourseId,
+    }),
     onSuccess: (task) => {
       message.success('实训任务已生成')
       setSelectedUnitId(undefined)
       navigate(`/teacher/tasks/${task.id}`)
     },
-    onError: (error) => message.error(toErrorMessage(error)),
+    onError: (error) => {
+      setGenerationProgress(0)
+      message.error(toErrorMessage(error))
+    },
   })
 
   useEffect(() => {
-    if (!createTask.isPending) {
-      setGenerationProgress(0)
-      return
-    }
-    setGenerationProgress(12)
+    if (!createTask.isPending) return
     const timer = window.setInterval(() => {
       setGenerationProgress((current) => Math.min(current + 6, 90))
     }, 900)
     return () => window.clearInterval(timer)
   }, [createTask.isPending])
+
+  const selectPlan = (planId: string | undefined) => {
+    setSelectedPlanId(planId)
+    setSelectedCourseId(undefined)
+  }
 
   const columns = [
     {
@@ -69,6 +88,7 @@ export function TrainingTaskLibrary() {
     { title: '难度', dataIndex: 'difficulty', width: 100, render: (value: TrainingTaskSummary['difficulty']) => <Tag color={DIFFICULTY_COLORS[value]}>{DIFFICULTY_LABELS[value]}</Tag> },
     { title: '状态', dataIndex: 'status', width: 112, render: (value: TrainingTaskSummary['status']) => <Tag color={TASK_STATUS_COLORS[value]}>{TASK_STATUS_LABELS[value]}</Tag> },
     { title: '训练技能', dataIndex: 'skill_count', width: 110 },
+    { title: '关联课程', width: 110, render: (_: unknown, row: TrainingTaskSummary) => row.course_id ? <Tag color="cyan">已关联课程</Tag> : row.plan_id ? <Tag color="blue">关联方案</Tag> : '—' },
     { title: '预计用时', dataIndex: 'est_minutes', width: 110, render: (value: number | null) => value ? `${value} 分钟` : '—' },
   ]
 
@@ -99,12 +119,49 @@ export function TrainingTaskLibrary() {
               className="task-generator-card__select"
               notFoundContent={graphQuery.isLoading ? '正在加载能力单元…' : '没有可用于生成任务的能力单元'}
             />
+            <div className="task-generator-card__curriculum">
+              <strong>关联培养方案（可选）</strong>
+              <Text type="secondary">选择课程后，任务会同时参考课程目标、教学内容和课程—技能映射；不选择时仍按原有图谱流程生成。</Text>
+              <Space wrap style={{ width: '100%' }}>
+                <Select
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  loading={plansQuery.isLoading}
+                  placeholder="选择已导入培养方案（可选）"
+                  value={selectedPlanId}
+                  onChange={selectPlan}
+                  options={(plansQuery.data ?? []).map((plan) => ({ value: plan.id, label: plan.name }))}
+                  className="task-generator-card__select"
+                />
+                <Select
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  loading={planQuery.isLoading}
+                  disabled={!selectedPlanId}
+                  placeholder={selectedPlanId ? '选择关联课程（可选）' : '请先选择培养方案'}
+                  value={selectedCourseId}
+                  onChange={setSelectedCourseId}
+                  options={(planQuery.data?.courses ?? []).map((course) => ({
+                    value: course.id,
+                    label: `${course.name}${course.total_hours ? ` · ${course.total_hours} 学时` : ''}`,
+                  }))}
+                  className="task-generator-card__select"
+                />
+              </Space>
+              {selectedPlanId && !selectedCourseId && <Text type="secondary">将关联整个培养方案；如需指定课程，请继续选择课程。</Text>}
+            </div>
             <Button
               type="primary"
               className="task-generator-card__button"
               loading={createTask.isPending}
               disabled={!selectedUnitId}
-              onClick={() => selectedUnitId && createTask.mutate(selectedUnitId)}
+              onClick={() => {
+                if (!selectedUnitId) return
+                setGenerationProgress(12)
+                createTask.mutate(selectedUnitId)
+              }}
             >
               {createTask.isPending ? '正在生成任务…' : '生成实训任务 →'}
             </Button>

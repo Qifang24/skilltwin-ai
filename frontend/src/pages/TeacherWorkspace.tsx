@@ -62,7 +62,7 @@ export function TeacherWorkspace() {
       title: '分析岗位需求',
       description: '基于真实招聘信息，梳理岗位所需技能和典型工作内容。',
       label: '开始岗位分析',
-      onClick: () => navigate('/teacher/market'),
+      onClick: () => navigate(`/teacher/market?job_id=${encodeURIComponent(TARGET_JOB)}`),
     },
     {
       step: '02',
@@ -87,7 +87,7 @@ export function TeacherWorkspace() {
         title="从岗位需求到实训任务"
         description="分析真实岗位需求，构建岗位能力图谱，生成并发布学生实训任务。"
         meta={<Space wrap><Tag color="blue">目标岗位 · AI 数据标注工程师</Tag><Tag color="green">{skillCount} 条技能规范已就绪</Tag></Space>}
-        actions={<Button type="primary" onClick={() => navigate('/teacher/market')}>从岗位需求开始</Button>}
+        actions={<Button type="primary" onClick={() => navigate(`/teacher/market?job_id=${encodeURIComponent(TARGET_JOB)}`)}>从岗位需求开始</Button>}
       />
 
       <Card className="workflow-card" title="三步完成实训任务设计" extra={<Text type="secondary">从真实岗位需求到可发布的学生实训任务</Text>}>
