@@ -14,6 +14,7 @@ from app.core.enums import (
 )
 from app.core.errors import ConflictError, ValidationError
 from app.models.competency import CompetencyGraph, CompetencyNode
+from app.models.curriculum import CourseSkillCoverage, CurriculumCourse, CurriculumPlan
 from app.models.ontology import Job, Skill
 from app.schemas.common import SourceRef
 from app.schemas.training import (
@@ -23,6 +24,7 @@ from app.schemas.training import (
     TaskObjective,
     TaskStep,
     TrainingTaskDraft,
+    GenerateTaskRequest,
 )
 from app.services.training_task_service import TrainingTaskService
 
@@ -112,6 +114,56 @@ def _persist(db: Session, draft: TrainingTaskDraft, node_id: str = "g1.unit1"):
     return service, result
 
 
+def _curriculum(db: Session) -> tuple[CurriculumPlan, CurriculumCourse]:
+    plan = CurriculumPlan(
+        id="plan_ai_2026",
+        name="人工智能技术应用 2026",
+        profession="人工智能技术应用",
+        version="2026",
+        source_name="校内人才培养方案",
+        is_partial=False,
+    )
+    course = CurriculumCourse(
+        id="course_annotation",
+        plan_id=plan.id,
+        course_code="AI204",
+        name="智能数据标注实训",
+        category="专业核心课",
+        total_hours=48,
+        objectives="掌握视觉数据标注规范与质量检查方法。",
+        practical_content="完成道路场景目标检测数据标注。",
+        learning_outcomes="提交标注结果和质量报告。",
+        source_chunk_id="curriculum:course:1",
+        source_page="12",
+        source_quote="智能数据标注实训：完成道路场景目标检测数据标注，提交标注结果和质量报告。",
+        field_evidence={
+            "practical_content": {
+                "chunk_id": "curriculum:course:1",
+                "page": "12",
+                "quote": "完成道路场景目标检测数据标注。",
+            }
+        },
+    )
+    db.add(plan)
+    db.flush()
+    db.add(course)
+    db.flush()
+    db.add(
+        CourseSkillCoverage(
+            course_id=course.id,
+            skill_code="annot.image",
+            coverage_strength=2,
+            coverage_status="covered",
+            source_chunk_id="curriculum:course:1",
+            source_page="12",
+            evidence_quote="掌握视觉数据标注规范。",
+            teacher_confirmed=True,
+        )
+    )
+    db.commit()
+    return plan, course
+
+
 # ---------------------------------------------------------------- 前置校验
 def test_cannot_generate_from_draft_graph(db: Session) -> None:
     """草案图谱的节点编码还会变，据此生成任务会留下悬空引用。"""
@@ -152,6 +204,116 @@ def test_task_links_to_source_node_and_skills(approved_graph: Session) -> None:
     assert result.task.source_node_id == "g1.unit1"
     codes = {s.skill_code for s in result.task.skills}
     assert "annot.image" in codes
+
+
+def test_legacy_generation_request_and_task_remain_unlinked(approved_graph: Session) -> None:
+    """新增课程参数必须保持可选，旧教师端请求不需要改动即可继续使用。"""
+    request = GenerateTaskRequest(node_id="g1.unit1")
+    assert request.plan_id is None
+    assert request.course_id is None
+
+    _, result = _persist(approved_graph, _draft())
+    assert result.task.plan_id is None
+    assert result.task.course_id is None
+
+
+def test_course_selection_is_inferred_validated_and_persisted(approved_graph: Session) -> None:
+    plan, course = _curriculum(approved_graph)
+    service = TrainingTaskService(approved_graph)
+    node, _, _ = service.node_context("g1.unit1")
+
+    curriculum = service.curriculum_context(node, course_id=course.id)
+    assert curriculum is not None
+    assert curriculum.plan.id == plan.id
+    assert curriculum.course is course
+    assert [item.skill_code for item in curriculum.mappings] == ["annot.image"]
+    assert "课程已核验的技能覆盖" in curriculum.prompt_text()
+    assert "完成道路场景目标检测数据标注" in curriculum.prompt_text()
+
+    result = service.persist(
+        node=node,
+        draft=_draft(),
+        sources=SOURCES,
+        curriculum=curriculum,
+    )
+    approved_graph.commit()
+    assert result.task.plan_id == plan.id
+    assert result.task.course_id == course.id
+
+
+def test_course_must_belong_to_selected_plan(approved_graph: Session) -> None:
+    _, course = _curriculum(approved_graph)
+    approved_graph.add(
+        CurriculumPlan(
+            id="another_plan",
+            name="另一培养方案",
+            source_name="校内材料",
+        )
+    )
+    approved_graph.commit()
+    node, _, _ = TrainingTaskService(approved_graph).node_context("g1.unit1")
+
+    with pytest.raises(ValidationError, match="不属于所选培养方案"):
+        TrainingTaskService(approved_graph).curriculum_context(
+            node, plan_id="another_plan", course_id=course.id
+        )
+
+
+def test_task_detail_returns_curriculum_course_and_original_evidence(
+    approved_graph: Session, client
+) -> None:
+    plan, course = _curriculum(approved_graph)
+    service = TrainingTaskService(approved_graph)
+    node, _, _ = service.node_context("g1.unit1")
+    curriculum = service.curriculum_context(node, course_id=course.id)
+    result = service.persist(
+        node=node,
+        draft=_draft(),
+        sources=SOURCES,
+        curriculum=curriculum,
+    )
+    approved_graph.commit()
+
+    response = client.get(f"/api/v1/training-tasks/{result.task.id}")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["plan_id"] == plan.id
+    assert payload["course_id"] == course.id
+    assert payload["curriculum_plan"]["name"] == plan.name
+    assert payload["curriculum_course"]["name"] == course.name
+    evidence_types = {item["evidence_type"] for item in payload["course_evidence"]}
+    assert {"course_source", "course_field", "skill_coverage"} <= evidence_types
+    assert any("道路场景目标检测" in item["quote"] for item in payload["course_evidence"])
+    assert all(item["is_generation_snapshot"] for item in payload["course_evidence"])
+
+    # 任务解释的是生成时依据；后来改课程或映射不能悄悄改写历史。
+    course.source_quote = "后来修改且不应覆盖任务历史的课程文字"
+    mapping = approved_graph.query(CourseSkillCoverage).filter_by(
+        course_id=course.id, skill_code="annot.image"
+    ).one()
+    mapping.evidence_quote = "后来修改的映射文字"
+    approved_graph.commit()
+    refreshed = client.get(f"/api/v1/training-tasks/{result.task.id}").json()
+    quotes = [item["quote"] for item in refreshed["course_evidence"]]
+    assert any("道路场景目标检测" in quote for quote in quotes)
+    assert all("后来修改" not in quote for quote in quotes)
+
+    citation_refresh = client.post(
+        f"/api/v1/training-tasks/{result.task.id}/refresh-citations"
+    )
+    assert citation_refresh.status_code == 200, citation_refresh.text
+    refreshed_evidence = citation_refresh.json()["course_evidence"]
+    assert refreshed_evidence
+    assert all(item["is_generation_snapshot"] for item in refreshed_evidence)
+    assert all("后来修改" not in item["quote"] for item in refreshed_evidence)
+
+    # 显式引用检查也保护没有数据库 FK 的历史 SQLite 安装。
+    course_delete = client.delete(f"/api/v1/curriculum/courses/{course.id}")
+    assert course_delete.status_code == 409
+    assert "实训任务" in course_delete.text
+    plan_delete = client.delete(f"/api/v1/curriculum/plans/{plan.id}")
+    assert plan_delete.status_code == 409
+    assert "实训任务" in plan_delete.text
 
 
 def test_objective_skill_alias_is_normalised(approved_graph: Session) -> None:

@@ -7,8 +7,26 @@
 
 from app.models.audit import Citation, LLMRun
 from app.models.competency import CompetencyEdge, CompetencyGraph, CompetencyNode
-from app.models.curriculum import CourseSkillCoverage, CurriculumCourse, CurriculumPlan
-from app.models.job_market import JobPosting, JobPostingSkill, SkillDemandSnapshot
+from app.models.curriculum import (
+    CourseSkillCoverage,
+    CurriculumAnalysis,
+    CurriculumCourse,
+    CurriculumDraftCourse,
+    CurriculumImportBatch,
+    CurriculumPlan,
+    OptimizationRun,
+    OptimizationSuggestion,
+    SkillCoverage,
+    SuggestionEvidence,
+)
+from app.models.job_market import (
+    JobImportBatch,
+    JobImportRow,
+    JobPosting,
+    JobPostingSkill,
+    JobSkillCandidate,
+    SkillDemandSnapshot,
+)
 from app.models.learning import (
     LearningPathActivity,
     LearningPath,
@@ -40,11 +58,17 @@ __all__ = [
     "CompetencyGraph",
     "CompetencyNode",
     "CourseSkillCoverage",
+    "CurriculumAnalysis",
     "CurriculumCourse",
+    "CurriculumDraftCourse",
+    "CurriculumImportBatch",
     "CurriculumPlan",
     "Job",
     "JobPosting",
     "JobPostingSkill",
+    "JobImportBatch",
+    "JobImportRow",
+    "JobSkillCandidate",
     "KnowledgeChunk",
     "KnowledgeDoc",
     "LearningPath",
@@ -53,7 +77,11 @@ __all__ = [
     "LearningPathPhase",
     "LLMRun",
     "Skill",
+    "SkillCoverage",
     "SkillDemandSnapshot",
+    "OptimizationRun",
+    "OptimizationSuggestion",
+    "SuggestionEvidence",
     "SkillProfile",
     "SkillProfileEntry",
     "Student",

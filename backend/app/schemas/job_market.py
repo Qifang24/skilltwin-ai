@@ -37,6 +37,25 @@ class DemandEvidenceRead(BaseModel):
     evidence_span: str
 
 
+class JobPostingRead(BaseModel):
+    id: str
+    job_id: str
+    title: str
+    company_name: str | None = None
+    company_type: str | None = None
+    city: str | None = None
+    raw_text: str
+    source_name: str | None = None
+    source_url: str | None = None
+    posted_at: datetime | None = None
+    data_flag: DataFlag
+    pii_scrubbed: bool
+    source_record_id: str | None = None
+    skills: list[dict] = Field(default_factory=list)
+
+    model_config = {"from_attributes": True}
+
+
 class SkillDemandRead(BaseModel):
     skill_code: str
     skill_name: str | None = None
@@ -92,10 +111,12 @@ class JobPostingImportItem(BaseModel):
     source_url: str = Field(min_length=8, max_length=1024)
     posted_at: datetime | None = None
     city: str | None = None
+    company_name: str | None = None
     company_type: str | None = None
     salary_text: str | None = None
     education_req: str | None = None
     experience_req: str | None = None
+    skill_codes: list[str] = Field(default_factory=list, max_length=100)
     data_flag: DataFlag = DataFlag.REAL
 
 
@@ -111,3 +132,33 @@ class JobPostingImportResponse(BaseModel):
     skipped_duplicates: int
     pii_scrubbed: int
     dashboard: JobMarketDashboardRead
+
+
+class JobImportMappingUpdate(BaseModel):
+    mapping: dict[str, str]
+
+
+class JobImportRowRead(BaseModel):
+    row_number: int
+    status: str
+    normalized_data: dict = Field(default_factory=dict)
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    posting_id: str | None = None
+
+
+class JobImportBatchRead(BaseModel):
+    id: str
+    job_id: str
+    job_name: str
+    filename: str
+    status: str
+    headers: list[str]
+    field_mapping: dict[str, str]
+    total_rows: int
+    success_count: int
+    failed_count: int
+    duplicate_count: int
+    filtered_count: int
+    rows: list[JobImportRowRead] = Field(default_factory=list)
+    result: dict = Field(default_factory=dict)

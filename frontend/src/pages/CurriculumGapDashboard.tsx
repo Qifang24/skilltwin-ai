@@ -1,40 +1,59 @@
-import { Alert, Button, Card, Empty, Space, Table, Tag, Typography } from 'antd'
-import { useQuery } from '@tanstack/react-query'
+import { Alert, Button, Card, Drawer, Empty, Form, Input, Modal, Progress, Select, Space, Statistic, Table, Tabs, Tag, Typography, Upload, message } from 'antd'
+import { InboxOutlined } from '@ant-design/icons'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-
 import { PageHero } from '@/components/PageHero'
+import { ProfessionalScopeBar } from '@/components/ProfessionalScopeBar'
+import { useProfessionalScope } from '@/hooks/useProfessionalScope'
+import { confirmCurriculumImport, createCourseSkillMapping, createCurriculumAnalysis, createCurriculumImport, deleteCourseSkillMapping, fetchCurriculumAnalysis, fetchCurriculumPlan, fetchSkillEvidence, fetchSkills, retryCurriculumImport, toErrorMessage, updateCourseSkillMapping } from '@/services/api'
+import type { CourseSkillMapping, CurriculumImportBatch, SkillCoverageSummary } from '@/types/professional'
+import { coveragePresentation } from '@/utils/professional'
 
-import { fetchCurriculumGap, toErrorMessage } from '@/services/api'
-import type { CurriculumSkillGap } from '@/types/curriculum'
-
-const { Paragraph, Text } = Typography
-const TARGET_JOB = 'ai_data_annotator'
-const STATUS: Record<CurriculumSkillGap['status'], [string, string]> = { unmapped: ['red', '未映射'], introduced: ['gold', '已提及'], practice: ['green', '实践目标'] }
-
+const { Dragger } = Upload; const { Text, Paragraph } = Typography
 export function CurriculumGapDashboard() {
-  const navigate = useNavigate()
-  const query = useQuery({ queryKey: ['curriculum-gap', TARGET_JOB], queryFn: () => fetchCurriculumGap(TARGET_JOB) })
-  const data = query.data
-  return <Space className="curriculum-page" orientation="vertical" size={24} style={{ width: '100%' }}>
-    <PageHero
-      eyebrow={'\u8bfe\u7a0b\u5bf9\u6807'}
-      title={'\u8bfe\u7a0b\u8986\u76d6\u4e0e\u5c97\u4f4d\u80fd\u529b\u5bf9\u6807'}
-      description={'\u67e5\u770b\u8bfe\u7a0b\u5bf9\u5c97\u4f4d\u80fd\u529b\u7684\u8986\u76d6\u60c5\u51b5\u4e0e\u539f\u6587\u8bc1\u636e\u3002'}
-      actions={<Button type="primary" onClick={() => navigate('/admin')}>{'\u2190 \u8fd4\u56de\u7ba1\u7406\u7aef'}</Button>}
-    />
-    {query.isError ? <Alert type="error" showIcon title="无法读取课程 Gap 数据" description={toErrorMessage(query.error)} /> : null}
-    {data ? <>
-      {data.data_quality.warnings.map((warning) => <Alert key={warning} type="warning" showIcon title={warning} />)}
-      <Card title={data.data_quality.plan_name} extra={data.data_quality.source_url ? <a href={data.data_quality.source_url} target="_blank" rel="noreferrer">查看公开方案</a> : null}>
-        <Text>已结构化 {data.data_quality.course_count} 门课程，映射 {data.data_quality.mapped_skill_count} 个技能。{data.data_quality.market_is_reliable ? '岗位频率已参与排序。' : '岗位频率未参与排序。'}</Text>
-      </Card>
-      <Card title="技能覆盖明细"><Table<CurriculumSkillGap> rowKey="skill_code" loading={query.isLoading} dataSource={data.skills} pagination={false} scroll={{ x: 800 }} locale={{ emptyText: <Empty description="暂无可对标技能" /> }} columns={[
-        { title: '技能', render: (_, row) => <Text strong>{row.skill_name}</Text> },
-        { title: '课程覆盖', width: 110, render: (_, row) => <Tag color={STATUS[row.status][0]}>{STATUS[row.status][1]}</Tag> },
-        { title: '岗位频率', width: 110, render: (_, row) => row.demand_frequency === null ? '未启用' : `${(row.demand_frequency * 100).toFixed(1)}%` },
-        { title: '课程原文证据', render: (_, row) => row.courses.length ? row.courses.map((course) => <Paragraph key={course.course_id} style={{ margin: 0 }}><Text strong>{course.course_name}</Text>（{course.total_hours ?? '—'} 学时）：{course.evidence_quote}</Paragraph>) : <Text type="secondary">当前结构化范围内暂无证据</Text> },
-        { title: '建议', render: (_, row) => row.recommendation },
-      ]} /></Card>
+  const navigate = useNavigate(); const queryClient = useQueryClient(); const [scope, setScope] = useProfessionalScope(); const [batch, setBatch] = useState<CurriculumImportBatch | null>(null); const [mappingModal, setMappingModal] = useState<{ courseId: string; mapping?: CourseSkillMapping } | null>(null); const [evidenceSkill, setEvidenceSkill] = useState<string | null>(null); const [form] = Form.useForm()
+  const ready = Boolean(scope.jobId && scope.planId && scope.graphId)
+  const analysis = useQuery({ queryKey: ['curriculum-analysis', scope], queryFn: () => fetchCurriculumAnalysis({ job_id: scope.jobId, plan_id: scope.planId, graph_id: scope.graphId }), enabled: ready, retry: false })
+  const plan = useQuery({ queryKey: ['curriculum-plan', scope.planId], queryFn: () => fetchCurriculumPlan(scope.planId), enabled: Boolean(scope.planId) })
+  const skills = useQuery({ queryKey: ['skills-for-mapping'], queryFn: () => fetchSkills({ limit: 500 }) })
+  const evidence = useQuery({ queryKey: ['curriculum-evidence', scope, evidenceSkill], queryFn: () => fetchSkillEvidence({ job_id: scope.jobId, plan_id: scope.planId, graph_id: scope.graphId, skill_code: evidenceSkill ?? '' }), enabled: Boolean(evidenceSkill && ready) })
+  const upload = useMutation({ mutationFn: ({ file, name }: { file: File; name?: string }) => createCurriculumImport(file, name), onSuccess: (next) => { setBatch(next); message.success('材料已解析到暂存区，请检查预览后确认') }, onError: (e) => message.error(toErrorMessage(e)) })
+  const retryImport = useMutation({ mutationFn: () => { if (!batch) throw new Error('尚未上传课程资料'); return retryCurriculumImport(batch.id) }, onSuccess: (next) => { setBatch(next); if (next.warnings.length) message.warning(next.warnings.join('；')); else message.success(`重新解析完成，识别到 ${next.courses.length} 门课程`) }, onError: (e) => message.error(toErrorMessage(e)) })
+  const confirmImport = useMutation({ mutationFn: () => { if (!batch) throw new Error('尚未上传'); return confirmCurriculumImport(batch.id, { plan_id: batch.plan_id ?? `plan_${batch.id}`, name: batch.plan_name ?? batch.file_name ?? '导入培养方案' }) }, onSuccess: (next) => { setScope({ planId: next.id }); setBatch(null); queryClient.invalidateQueries({ queryKey: ['curriculum-plans'] }); message.success('培养方案已创建') }, onError: (e) => message.error(toErrorMessage(e)) })
+  const analyze = useMutation({ mutationFn: () => createCurriculumAnalysis({ job_id: scope.jobId, plan_id: scope.planId, graph_id: scope.graphId }), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['curriculum-analysis'] }); message.success('课程技能覆盖已重新计算') }, onError: (e) => message.error(toErrorMessage(e)) })
+  const saveMapping = useMutation({ mutationFn: async (values: { skill_code: string; coverage_status: CourseSkillMapping['coverage_status']; evidence_quote?: string; reason?: string }) => { if (!mappingModal) throw new Error('未选择课程'); return mappingModal.mapping ? updateCourseSkillMapping(mappingModal.mapping.id, { ...values, origin: 'teacher', teacher_confirmed: true, edited_by: 'teacher' }) : createCourseSkillMapping(mappingModal.courseId, { ...values, origin: 'teacher', teacher_confirmed: true, edited_by: 'teacher' }) }, onSuccess: () => { setMappingModal(null); void queryClient.invalidateQueries({ queryKey: ['curriculum-analysis'] }); message.success('映射已保存，覆盖指标将同步刷新') }, onError: (e) => message.error(toErrorMessage(e)) })
+  const removeMapping = useMutation({ mutationFn: deleteCourseSkillMapping, onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['curriculum-analysis'] }); message.success('映射已删除') }, onError: (e) => message.error(toErrorMessage(e)) })
+  const rows = analysis.data?.skills ?? []
+  const mapped = new Map<string, CourseSkillMapping[]>(); rows.forEach((row) => row.courses.forEach((item) => mapped.set(item.course_id, [...(mapped.get(item.course_id) ?? []), item])))
+  const openMapping = (courseId: string, item?: CourseSkillMapping) => { setMappingModal({ courseId, mapping: item }); form.setFieldsValue({ skill_code: item?.skill_code, coverage_status: item?.coverage_status ?? 'partial', reason: item?.reason, evidence_quote: item?.evidence_quote ?? item?.evidence?.quote ?? '' }) }
+  return <Space className="curriculum-page" orientation="vertical" size={18} style={{ width: '100%' }}>
+    <PageHero eyebrow="课程对标" title="课程覆盖与岗位能力对标" description="课程资料、已审核图谱和岗位需求共同决定覆盖结果；每个结论均可回看证据链。" actions={<Button onClick={() => navigate('/admin')}>← 返回管理端</Button>} />
+    <ProfessionalScopeBar />
+    <Card title="导入课程资料" extra={<Text type="secondary">PDF / DOCX / TXT / JSON</Text>}><Dragger accept=".pdf,.docx,.txt,.json" maxCount={1} showUploadList={false} beforeUpload={(file) => { void upload.mutate({ file: file as File }); return false }}><p className="ant-upload-drag-icon"><InboxOutlined /></p><p className="ant-upload-text">上传培养方案或课程资料</p><p className="ant-upload-hint">扫描型 PDF 无文本时会提示使用文字版/OCR 版；上传文件存入运行目录并记录哈希。</p></Dragger>{upload.isPending ? <Paragraph>正在解析课程结构…</Paragraph> : null}</Card>
+    {batch ? <Card title="课程解析预览" extra={<Space><Button loading={confirmImport.isPending} onClick={() => confirmImport.mutate()} type="primary">确认导入方案</Button><Button loading={retryImport.isPending} disabled={confirmImport.isPending} onClick={() => retryImport.mutate()}>重新解析</Button></Space>}>{batch.warnings.map((warning) => <Alert key={warning} type="warning" showIcon title={warning} />)}<Table rowKey="id" pagination={false} dataSource={batch.courses} columns={[{ title: '课程', dataIndex: 'name' }, { title: '学时', dataIndex: 'total_hours' }, { title: '课程目标', dataIndex: 'objectives', ellipsis: true }, { title: '原文依据', render: (_, course) => course.evidence?.objectives?.quote ?? '—' }]} /></Card> : null}
+    {!ready ? <Empty description="请选择岗位、培养方案和已审核能力图谱后开始正式对标" /> : null}
+    {analysis.isError ? <Alert type="error" showIcon title="尚未创建课程对标分析" description={<Space orientation="vertical" size={2}><span>{toErrorMessage(analysis.error)}</span><Text type="secondary">这不是拒绝你的培养方案；请在当前岗位、方案和已审核能力图谱范围内开始一次正式对标分析。</Text></Space>} action={ready ? <Button size="small" type="primary" loading={analyze.isPending} onClick={() => analyze.mutate()}>开始对标分析</Button> : <Button size="small" onClick={() => analysis.refetch()}>重试</Button>} /> : null}
+    {ready ? <Card title="正式对标分析" extra={<Button type="primary" loading={analyze.isPending} onClick={() => analyze.mutate()}>重新分析</Button>}><Text type="secondary">仅允许映射至已审核图谱中的规范技能；系统校验每一项课程原文连续引文。</Text></Card> : null}
+    {analysis.data ? <>
+      {analysis.data.warnings?.map((warning) => <Alert key={warning} type="warning" showIcon title={warning} />)}
+      <Card title="覆盖汇总"><Space wrap size="large"><Statistic title="课程" value={analysis.data.metrics.course_count} /><Statistic title="已覆盖" value={analysis.data.metrics.covered} styles={{ content: { color: '#389e0d' } }} /><Statistic title="部分覆盖" value={analysis.data.metrics.partial} styles={{ content: { color: '#d48806' } }} /><Statistic title="未覆盖" value={analysis.data.metrics.uncovered} styles={{ content: { color: '#cf1322' } }} /><Progress percent={Math.round((analysis.data.metrics.covered / Math.max(rows.length, 1)) * 100)} /></Space></Card>
+      <Tabs items={[
+        { key: 'skills', label: '技能视图', children: <Table<SkillCoverageSummary> rowKey="skill_code" dataSource={rows} scroll={{ x: 850 }} columns={[
+          { title: '技能', render: (_, row) => <Text strong>{row.skill_name ?? row.skill_code}</Text> },
+          { title: '覆盖', render: (_, row) => { const view = coveragePresentation(row.status); return <Tag color={view.color}>{view.label}</Tag> } },
+          { title: '岗位频率', render: (_, row) => row.demand_frequency == null ? '—' : `${(row.demand_frequency * 100).toFixed(1)}%` },
+          { title: '课程', render: (_, row) => row.courses.map((item) => <Tag key={item.id}>{item.course_name ?? item.course_id}</Tag>) },
+          { title: '证据链', render: (_, row) => <Button type="link" onClick={() => setEvidenceSkill(row.skill_code)}>查看</Button> },
+        ]} /> },
+        { key: 'courses', label: '课程视图', children: <Table rowKey="id" dataSource={plan.data?.courses ?? []} columns={[
+          { title: '课程', dataIndex: 'name' }, { title: '学时', dataIndex: 'total_hours' },
+          { title: '映射技能', render: (_, course) => <Space wrap>{(mapped.get(course.id) ?? []).map((item) => <Tag closable onClose={(e) => { e.preventDefault(); void removeMapping.mutate(item.id) }} onClick={() => openMapping(course.id, item)} key={item.id}>{item.skill_name ?? item.skill_code}</Tag>)}<Button size="small" onClick={() => openMapping(course.id)}>添加映射</Button></Space> },
+          { title: '教学任务', render: (_, course) => <Button type="link" onClick={() => navigate(`/teacher/tasks?plan_id=${encodeURIComponent(scope.planId)}&course_id=${encodeURIComponent(course.id)}&graph_id=${encodeURIComponent(scope.graphId)}`)}>生成教学任务</Button> },
+        ]} /> },
+      ]} />
     </> : null}
+    <Modal title={mappingModal?.mapping ? '修改课程技能映射' : '新增课程技能映射'} open={Boolean(mappingModal)} confirmLoading={saveMapping.isPending} onCancel={() => setMappingModal(null)} onOk={() => form.validateFields().then((values) => saveMapping.mutate(values)).catch(() => undefined)}><Form form={form} layout="vertical"><Form.Item name="skill_code" label="规范技能" rules={[{ required: true, message: '请选择技能' }]}><Select showSearch optionFilterProp="label" options={(skills.data?.items ?? []).map((skill) => ({ value: skill.skill_code, label: `${skill.name_zh} · ${skill.skill_code}` }))} /></Form.Item><Form.Item noStyle shouldUpdate={(prev, next) => prev.coverage_status !== next.coverage_status}>{() => <Form.Item name="evidence_quote" label="课程原文依据" rules={[{ required: form.getFieldValue('coverage_status') !== 'uncovered', message: '已覆盖或部分覆盖必须填写课程原文连续引文' }]}><Input.TextArea placeholder="粘贴课程原文中的连续句子；未覆盖可留空" /></Form.Item>}</Form.Item><Form.Item name="coverage_status" label="覆盖状态" rules={[{ required: true }]}><Select options={[{ value: 'covered', label: '已覆盖' }, { value: 'partial', label: '部分覆盖' }, { value: 'uncovered', label: '未覆盖' }]} /></Form.Item><Form.Item name="reason" label="教师依据"><Input.TextArea placeholder="说明课程与技能的对应依据" /></Form.Item></Form></Modal>
+    {evidenceSkill ? <Drawer title="JD → 技能 → 图谱 → 课程原文" open destroyOnHidden onClose={() => setEvidenceSkill(null)} size="large">{evidence.isLoading ? <Paragraph>正在读取证据链…</Paragraph> : null}{evidence.data ? <Space orientation="vertical" style={{ width: '100%' }}>{evidence.data.job_evidence.map((item, i) => <Card size="small" key={`job-${i}-${item.title}`} title={`JD · ${item.title}`}><Paragraph>“{item.quote}”</Paragraph>{item.source_url ? <a href={item.source_url}>原始来源</a> : null}</Card>)}{evidence.data.graph_evidence ? <Card key="approved-graph" size="small" title="已审核图谱">{evidence.data.graph_evidence.node_name} · 掌握度 {evidence.data.graph_evidence.mastery_level ?? '—'}</Card> : null}{evidence.data.course_evidence.map((item, i) => <Card size="small" key={`course-${i}-${item.chunk_id ?? item.course_name}`} title={`课程 · ${item.course_name}`}><Paragraph>“{item.quote}”</Paragraph><Text type="secondary">页码 {item.page ?? '—'} · chunk {item.chunk_id ?? '—'}</Text></Card>)}</Space> : null}{evidence.isError ? <Alert type="error" title={toErrorMessage(evidence.error)} /> : null}</Drawer> : null}
   </Space>
 }

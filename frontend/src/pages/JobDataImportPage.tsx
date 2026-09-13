@@ -1,134 +1,34 @@
-import { Alert, Button, Card, Descriptions, Space, Tag, Typography, Upload, message } from 'antd'
+import { Alert, Button, Card, Descriptions, Input, Select, Space, Steps, Table, Tag, Typography, Upload, message } from 'antd'
 import { InboxOutlined } from '@ant-design/icons'
 import type { UploadProps } from 'antd'
+import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-
 import { PageHero } from '@/components/PageHero'
-import { importJobPostings, toErrorMessage } from '@/services/api'
-import type { JobPostingImportPayload, JobPostingImportResponse } from '@/types/jobMarket'
+import { confirmJobImport, createJobImport, fetchJobImportPreview, toErrorMessage, updateJobImportMapping } from '@/services/api'
+import type { JobImportBatch, JobImportResult, JobImportRow } from '@/types/professional'
+import { importRowPresentation } from '@/utils/professional'
 
 const { Dragger } = Upload
-const { Paragraph, Text } = Typography
-
-const TEMPLATE: JobPostingImportPayload = {
-  job_id: 'ai_data_annotator',
-  job_name: 'AI 数据标注工程师',
-  postings: [{
-    id: 'public-jd-20260911-001',
-    title: 'AI 数据标注工程师',
-    raw_text: '岗位职责：负责图像、文本等数据的标注、质检与问题反馈；熟悉标注规范和质量控制流程。任职要求：具备数据处理能力，能使用常见标注工具，工作细致负责。',
-    source_name: '公开招聘来源名称',
-    source_url: 'https://example.com/jobs/public-jd-20260911-001',
-    posted_at: '2026-09-11T00:00:00+08:00',
-    city: '北京',
-    company_type: '互联网企业',
-    data_flag: 'REAL',
-  }],
-}
-
-function isImportPayload(value: unknown): value is JobPostingImportPayload {
-  return Boolean(
-    value
-    && typeof value === 'object'
-    && Array.isArray((value as JobPostingImportPayload).postings)
-    && (value as JobPostingImportPayload).postings.length > 0,
-  )
-}
+const { Text, Paragraph } = Typography
+const FIELDS = [['title', '岗位名称 *'], ['company_name', '公司'], ['raw_text', '岗位 JD *'], ['skills', '技能要求'], ['city', '城市'], ['posted_at', '发布日期'], ['source_name', '来源 *'], ['source_url', '来源链接'], ['salary_text', '薪资'], ['education_req', '学历要求'], ['experience_req', '工作经验'], ['source_record_id', '来源记录 ID']] as const
+const REQUIRED = new Set(['title', 'raw_text', 'source_name'])
+function stateTag(row: JobImportRow) { const view = importRowPresentation(row.state); return <Tag color={view.color}>{view.label}</Tag> }
 
 export function JobDataImportPage() {
-  const navigate = useNavigate()
-  const [payload, setPayload] = useState<JobPostingImportPayload | null>(null)
-  const [fileName, setFileName] = useState('')
-  const [importing, setImporting] = useState(false)
-  const [result, setResult] = useState<JobPostingImportResponse | null>(null)
-
-  const downloadTemplate = () => {
-    const blob = new Blob([JSON.stringify(TEMPLATE, null, 2)], { type: 'application/json;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = '岗位数据导入模板.json'
-    anchor.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const uploadProps: UploadProps = {
-    accept: '.json,application/json',
-    maxCount: 1,
-    showUploadList: false,
-    beforeUpload: async (file) => {
-      try {
-        const parsed: unknown = JSON.parse(await file.text())
-        if (!isImportPayload(parsed)) throw new Error('文件需包含至少一条 postings 岗位记录')
-        setPayload(parsed)
-        setFileName(file.name)
-        setResult(null)
-        message.success(`已读取 ${parsed.postings.length} 条岗位记录`)
-      } catch (error) {
-        setPayload(null)
-        setFileName('')
-        message.error(error instanceof Error ? error.message : '无法读取 JSON 文件')
-      }
-      return false
-    },
-  }
-
-  const submit = async () => {
-    if (!payload) return
-    setImporting(true)
-    try {
-      const nextResult = await importJobPostings(payload)
-      setResult(nextResult)
-      message.success('岗位数据已导入，技能需求统计已重建')
-    } catch (error) {
-      message.error(toErrorMessage(error))
-    } finally {
-      setImporting(false)
-    }
-  }
-
-  return (
-    <Space className="job-data-import-page" orientation="vertical" size={20} style={{ width: '100%' }}>
-      <PageHero
-        eyebrow="管理端 · 岗位数据治理"
-        title="导入可追溯的岗位需求数据"
-        description="将公开岗位 JD 导入系统，保留来源与原文证据，自动校验、去重、脱敏并更新岗位技能需求。"
-        meta={<Tag color="cyan">单次最多导入 500 条岗位记录</Tag>}
-        actions={<Button type="primary" onClick={() => navigate('/admin')}>{'\u2190 \u8fd4\u56de\u7ba1\u7406\u7aef'}</Button>}
-      />
-
-      <Card className="job-import-card" title="上传岗位数据" extra={<Button type="link" onClick={downloadTemplate}>下载 JSON 模板</Button>}>
-        <Alert
-          type="info"
-          showIcon
-          message="仅导入获得授权或公开可引用的岗位信息"
-          description="每条 REAL 记录必须包含岗位原文、公开来源链接和发布日期。系统会移除文本中的手机号、邮箱和微信号，并跳过重复的岗位原文。"
-        />
-        <Dragger className="job-import-card__dropzone" {...uploadProps}>
-          <p className="ant-upload-drag-icon"><InboxOutlined /></p>
-          <p className="ant-upload-text">拖入 JSON 文件，或点击选择文件</p>
-          <p className="ant-upload-hint">请先下载模板并按字段填写；支持一个岗位及其同岗位族的多条 JD。</p>
-        </Dragger>
-        {payload ? (
-          <div className="job-import-card__ready">
-            <div><Text strong>{fileName}</Text><br /><Text type="secondary">已识别 {payload.postings.length} 条记录，目标岗位：{payload.job_name ?? 'AI 数据标注工程师'}</Text></div>
-            <Button type="primary" size="large" loading={importing} onClick={submit}>校验并导入</Button>
-          </div>
-        ) : null}
-      </Card>
-
-      {result ? (
-        <Card className="job-import-result" title="导入结果">
-          <Descriptions column={{ xs: 2, md: 4 }}>
-            <Descriptions.Item label="新增"><b>{result.created}</b> 条</Descriptions.Item>
-            <Descriptions.Item label="更新"><b>{result.updated}</b> 条</Descriptions.Item>
-            <Descriptions.Item label="重复跳过"><b>{result.skipped_duplicates}</b> 条</Descriptions.Item>
-            <Descriptions.Item label="已脱敏"><b>{result.pii_scrubbed}</b> 条</Descriptions.Item>
-          </Descriptions>
-          <Paragraph type="secondary">当前统计已基于 {result.dashboard.data_quality.real_postings} 条真实岗位记录重建，可前往教师端「分析岗位需求」查看结果。</Paragraph>
-        </Card>
-      ) : null}
-    </Space>
-  )
+  const navigate = useNavigate(); const [batch, setBatch] = useState<JobImportBatch | null>(null); const [result, setResult] = useState<JobImportResult | null>(null); const [jobId, setJobId] = useState('ai_data_annotator'); const [jobName, setJobName] = useState('AI 数据标注工程师'); const [mapping, setMapping] = useState<Record<string, string>>({}); const [step, setStep] = useState(0)
+  const upload = useMutation({ mutationFn: (file: File) => createJobImport(file, jobId.trim(), jobName.trim()), onSuccess: (next) => { setBatch(next); setMapping(next.mapping ?? {}); setStep(1); message.success('文件已暂存，尚未写入正式岗位数据') }, onError: (error) => message.error(toErrorMessage(error)) })
+  const saveMapping = useMutation({ mutationFn: async () => { if (!batch) throw new Error('请先上传文件'); const next = await updateJobImportMapping(batch.id, mapping, jobName); return fetchJobImportPreview(next.id) }, onSuccess: (next) => { setBatch(next); setStep(2); message.success('字段映射已校验') }, onError: (error) => message.error(toErrorMessage(error)) })
+  const confirm = useMutation({ mutationFn: () => { if (!batch) throw new Error('请先上传文件'); return confirmJobImport(batch.id) }, onSuccess: (next) => { setResult(next); setStep(3); message.success('导入完成，岗位需求统计已重建') }, onError: (error) => message.error(toErrorMessage(error)) })
+  const previewRows = batch?.preview_rows ?? batch?.rows ?? []; const sourceColumns = batch?.headers ?? []; const sourceOptions = sourceColumns.map((column) => ({ value: column, label: column })); const validMapping = [...REQUIRED].every((needed) => Boolean(mapping[needed])); const importableCount = previewRows.filter((row) => row.state === 'valid' || row.state === 'warning').length; const duplicateCount = previewRows.filter((row) => row.state === 'duplicate').length
+  const uploadProps: UploadProps = { accept: '.csv,.json,text/csv,application/json', maxCount: 1, showUploadList: false, beforeUpload: (file) => { if (!jobId.trim() || !jobName.trim()) { message.error('请先填写岗位 ID 和岗位名称'); return Upload.LIST_IGNORE }; if (file.size > 10 * 1024 * 1024) { message.error('文件不得超过 10MB'); return Upload.LIST_IGNORE }; void upload.mutate(file as File); return false } }
+  const downloadTemplate = () => { const content = 'title,raw_text,source_name,source_url,posted_at,city,company_name\nAI 数据标注工程师,负责图像文本数据标注与质检,公开招聘网,https://example.com/jobs/1,2026-09-11,北京,示例企业\n'; const url = URL.createObjectURL(new Blob(['\uFEFF', content], { type: 'text/csv;charset=utf-8' })); const link = document.createElement('a'); link.href = url; link.download = '岗位导入模板.csv'; link.click(); URL.revokeObjectURL(url) }
+  return <Space className="job-data-import-page" orientation="vertical" size={20} style={{ width: '100%' }}>
+    <PageHero eyebrow="管理端 · 岗位数据治理" title="导入可追溯的岗位需求数据" description="CSV/JSON 分阶段暂存：先映射与校验，再确认写入。系统会脱敏、去重并保留逐行结果。" actions={<Button onClick={() => navigate('/admin')}>← 返回管理端</Button>} />
+    <Card className="admin-step-card"><Steps current={step} items={[{ title: '上传文件' }, { title: '字段映射' }, { title: '预览校验' }, { title: '导入结果' }]} /></Card>
+    {step === 0 ? <Card className="admin-section-card admin-import-section" title="1. 上传 CSV 或 JSON" extra={<Button type="link" onClick={downloadTemplate}>下载 CSV 模板</Button>}><Alert type="info" showIcon title="暂存不写入正式岗位数据" description="支持 UTF-8 BOM、UTF-8、GB18030 的 CSV，以及数组或 { postings: [...] } JSON；最大 10MB、5000 行。" /><Space className="admin-import-fields" wrap><Space><Text strong>岗位 ID</Text><Input aria-label="岗位 ID" value={jobId} onChange={(e) => setJobId(e.target.value)} style={{ width: 220 }} /></Space><Space><Text strong>岗位名称</Text><Input aria-label="岗位名称" value={jobName} onChange={(e) => setJobName(e.target.value)} style={{ width: 230 }} /></Space></Space><Dragger className="job-import-card__dropzone" {...uploadProps}><p className="ant-upload-drag-icon"><InboxOutlined /></p><p className="ant-upload-text">拖入 CSV / JSON，或点击选择</p><p className="ant-upload-hint">上传后可自由指定字段映射。</p></Dragger>{upload.isPending ? <Paragraph>正在读取、脱敏并生成预览…</Paragraph> : null}</Card> : null}
+    {step === 1 && batch ? <Card className="admin-section-card" title="2. 字段映射" extra={<Button onClick={() => setStep(0)}>重新上传</Button>}><Alert type="warning" showIcon title="请为系统字段选择上传文件中的对应列；岗位名称、岗位 JD、来源为必填" /><Space className="admin-mapping-list" orientation="vertical" style={{ width: '100%' }} size="middle"><Input value={jobName} onChange={(e) => setJobName(e.target.value)} placeholder="目标岗位名称" />{FIELDS.map(([field, label]) => <Space className="admin-mapping-row" key={field} wrap><Text strong style={{ width: 180 }}>{label}</Text><Select allowClear placeholder="选择文件列（可留空）" value={mapping[field]} onChange={(value) => setMapping((current) => { const next = { ...current }; if (value) next[field] = value; else delete next[field]; return next })} options={sourceOptions} style={{ width: 260 }} /></Space>)}</Space><div className="job-import-card__ready"><Text type={validMapping ? undefined : 'danger'}>{validMapping ? '必填字段已映射。' : '请映射全部三个必填字段。'}</Text><Button type="primary" disabled={!validMapping} loading={saveMapping.isPending} onClick={() => saveMapping.mutate()}>保存并校验</Button></div></Card> : null}
+    {step === 2 && batch ? <Card className="admin-section-card" title="3. 预览、校验与去重" extra={<Space><Button onClick={() => setStep(1)}>返回映射</Button><Button type="primary" disabled={importableCount === 0} loading={confirm.isPending} onClick={() => confirm.mutate()}>确认导入</Button></Space>}><Alert type="info" showIcon title="仅确认导入后才创建正式岗位记录" description="预览最多显示前 20 行。联系方式已在暂存阶段脱敏；无发布日期会被保留，但不进入趋势统计。" />{previewRows.length > 0 && importableCount === 0 ? <Alert type="warning" showIcon title="本批次没有可导入记录" description={duplicateCount === previewRows.length ? '本批次记录全部与该岗位已有数据重复。若你是在验证去重功能，这是预期结果；若要新增数据，请返回并上传尚未导入的岗位，或使用新的岗位 ID。' : '本批次记录均未通过校验，请查看下方逐行原因并返回映射或重新上传。'} /> : null}<Table<JobImportRow> rowKey="row_number" dataSource={previewRows.slice(0, 20)} pagination={false} scroll={{ x: 850 }} columns={[{ title: '行', dataIndex: 'row_number', width: 65 }, { title: '状态', render: (_, row) => stateTag(row) }, { title: '岗位名称', render: (_, row) => row.data.title ?? '—' }, { title: 'JD', render: (_, row) => <Text ellipsis={{ tooltip: row.data.raw_text ?? '' }} style={{ maxWidth: 350 }}>{row.data.raw_text ?? '—'}</Text> }, { title: '校验/重复原因', render: (_, row) => row.issues.map((item) => item.message).join('；') || '—' }]} /></Card> : null}
+    {step === 3 && result ? <Card className="admin-section-card admin-import-result" title="4. 导入结果" extra={<Button type="primary" onClick={() => navigate(`/teacher/market?job_id=${encodeURIComponent(result.job_id)}`)}>查看岗位需求分析</Button>}><Descriptions column={{ xs: 2, md: 3 }}><Descriptions.Item label="新增">{result.created}</Descriptions.Item><Descriptions.Item label="重复跳过">{result.skipped_duplicates}</Descriptions.Item><Descriptions.Item label="过滤">{result.filtered}</Descriptions.Item><Descriptions.Item label="失败">{result.failed}</Descriptions.Item><Descriptions.Item label="已脱敏">{result.pii_scrubbed}</Descriptions.Item><Descriptions.Item label="岗位 ID">{result.job_id}</Descriptions.Item></Descriptions>{result.warnings.map((warning) => <Alert key={warning} type="warning" showIcon title={warning} />)}<Table<JobImportRow> rowKey="row_number" size="small" pagination={{ pageSize: 10 }} dataSource={result.rows.filter((row) => row.state !== 'imported' || row.issues.length > 0)} locale={{ emptyText: '全部记录导入成功，没有失败或重复记录' }} columns={[{ title: '行', dataIndex: 'row_number', width: 65 }, { title: '结果', render: (_, row) => stateTag(row) }, { title: '岗位名称', render: (_, row) => String(row.data.title ?? '—') }, { title: '原因', render: (_, row) => row.issues.map((item) => item.message).join('；') || '—' }]} /><Button type="link" onClick={() => navigate(`/admin/curriculum-gap?job_id=${encodeURIComponent(result.job_id)}`)}>继续进行课程对标 →</Button></Card> : null}
+  </Space>
 }

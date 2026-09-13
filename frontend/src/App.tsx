@@ -95,7 +95,7 @@ function App() {
 
       <Content className="app-content">
         <main className="app-shell">
-          {backTarget && !['/teacher/market', '/teacher/graphs', '/teacher/tasks', '/student/diagnosis', '/student/path', '/admin/job-data'].some((route) => pathname.startsWith(route)) && !pathname.startsWith('/teacher/curriculum-gap') && !pathname.startsWith('/teacher/curriculum-optimization') && (
+          {backTarget && !['/teacher/market', '/teacher/graphs', '/teacher/tasks', '/student/diagnosis', '/student/path', '/admin/job-data', '/admin/curriculum-gap', '/admin/curriculum-optimization', '/admin/user-testing', '/teacher/user-testing'].some((route) => pathname.startsWith(route)) && !pathname.startsWith('/teacher/curriculum-gap') && !pathname.startsWith('/teacher/curriculum-optimization') && (
             <div className="portal-backbar">
               <Button type="text" onClick={returnToPrevious}>← 返回上一步</Button>
             </div>
@@ -113,6 +113,9 @@ function App() {
             <Route path="/teacher/tasks/:taskId" element={<TrainingTaskDetail />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/job-data" element={<JobDataImportPage />} />
+            <Route path="/admin/curriculum-gap" element={<CurriculumGapDashboard />} />
+            <Route path="/admin/curriculum-optimization" element={<CurriculumOptimization />} />
+            <Route path="/admin/user-testing" element={<UserTestingPage />} />
             <Route path="/student" element={<StudentDashboard />} />
             <Route path="/student/diagnosis" element={<StudentDashboard />} />
             <Route path="/student/path" element={<StudentLearningPathPage />} />

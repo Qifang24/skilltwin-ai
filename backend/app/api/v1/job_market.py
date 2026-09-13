@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import re
-from datetime import datetime, timezone
-from urllib.parse import urlparse
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from sqlalchemy import select
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.db import get_db
-from app.core.enums import DataFlag
-from app.core.errors import ValidationError
 from app.models.job_market import JobPosting
 from app.models.ontology import Job
 from app.schemas.job_market import (
@@ -19,97 +16,45 @@ from app.schemas.job_market import (
     JobMarketDashboardRead,
     JobPostingImportRequest,
     JobPostingImportResponse,
+    JobImportBatchRead,
+    JobImportMappingUpdate,
+    JobPostingRead,
 )
+from app.services.job_import_service import JobImportService
 from app.services.job_market_service import JobMarketService
 
 router = APIRouter(prefix="/job-market", tags=["job-market"])
-
-_PII_PATTERNS = [
-    (re.compile(r"1[3-9]\d{9}"), "[手机号已脱敏]"),
-    (re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.]+\b"), "[邮箱已脱敏]"),
-    (re.compile(r"(微信|weixin|wechat|VX|vx)[:：\s]*[A-Za-z0-9_-]{5,}"), "[微信号已脱敏]"),
-]
+import_router = APIRouter(prefix="/job-imports", tags=["job-imports"])
 
 
-def _scrub_pii(text: str) -> tuple[str, bool]:
-    scrubbed = text
-    for pattern, replacement in _PII_PATTERNS:
-        scrubbed = pattern.sub(replacement, scrubbed)
-    return scrubbed, scrubbed != text
-
+@router.get("/jobs", summary="可用于专业建设的岗位范围")
+def list_market_jobs(db: Session = Depends(get_db)) -> list[dict[str, str]]:
+    return [{"id": job.id, "name": job.name} for job in db.execute(select(Job).order_by(Job.name, Job.id)).scalars()]
 
 @router.post("/import", response_model=JobPostingImportResponse, summary="导入并校验公开岗位 JD")
 def import_job_postings(
     payload: JobPostingImportRequest, db: Session = Depends(get_db)
 ) -> JobPostingImportResponse:
-    """管理端导入：保留原文、来源和日期，自动脱敏并重建可回查的技能统计。"""
-    ids: set[str] = set()
-    raw_texts: set[str] = set()
-    for index, item in enumerate(payload.postings, start=1):
-        if item.id in ids:
-            raise ValidationError(f"第 {index} 条岗位记录的 ID 重复：{item.id}")
-        ids.add(item.id)
-        normalized = " ".join(item.raw_text.split())
-        if normalized in raw_texts:
-            raise ValidationError(f"第 {index} 条岗位记录与本次导入中的其他 JD 原文重复")
-        raw_texts.add(normalized)
-        parsed = urlparse(item.source_url)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            raise ValidationError(f"第 {index} 条岗位记录的来源链接必须是有效的 http(s) 地址")
-        if item.data_flag is DataFlag.REAL and item.posted_at is None:
-            raise ValidationError(f"第 {index} 条 REAL 岗位记录缺少发布日期")
-
-    if db.get(Job, payload.job_id) is None:
-        db.add(Job(id=payload.job_id, name=payload.job_name))
-        db.flush()
-
-    existing_rows = db.query(JobPosting).filter(JobPosting.job_id == payload.job_id).all()
-    existing_by_raw = {" ".join(row.raw_text.split()): row.id for row in existing_rows}
-    created = updated = skipped_duplicates = pii_scrubbed = 0
-
-    for item in payload.postings:
-        normalized = " ".join(item.raw_text.split())
-        duplicate_id = existing_by_raw.get(normalized)
-        if duplicate_id is not None and duplicate_id != item.id:
-            skipped_duplicates += 1
-            continue
-        raw_text, was_scrubbed = _scrub_pii(item.raw_text)
-        if was_scrubbed:
-            pii_scrubbed += 1
-        fields = dict(
+    """兼容旧 JSON 契约；执行统一暂存、校验、去重、确认与重算服务。"""
+    service = JobImportService(db)
+    try:
+        batch, dashboard = service.import_legacy_records(
             job_id=payload.job_id,
-            title=item.title,
-            raw_text=raw_text,
-            source_name=item.source_name,
-            source_url=item.source_url,
-            posted_at=item.posted_at,
-            collected_at=datetime.now(timezone.utc),
-            city=item.city,
-            company_type=item.company_type,
-            salary_text=item.salary_text,
-            education_req=item.education_req,
-            experience_req=item.experience_req,
-            data_flag=item.data_flag,
-            pii_scrubbed=was_scrubbed,
+            job_name=payload.job_name,
+            records=[item.model_dump(mode="json") for item in payload.postings],
         )
-        current = db.get(JobPosting, item.id)
-        if current is None:
-            db.add(JobPosting(id=item.id, **fields))
-            created += 1
-        else:
-            for key, value in fields.items():
-                setattr(current, key, value)
-            updated += 1
-
-    db.flush()
-    result = JobMarketService(db).analyze(payload.job_id)
-    db.commit()
+        rows = service.rows(batch.id)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    result = batch.result or {}
     return JobPostingImportResponse(
-        created=created,
-        updated=updated,
-        skipped_duplicates=skipped_duplicates,
-        pii_scrubbed=pii_scrubbed,
-        dashboard=result.dashboard,
+        created=int(result.get("created", 0)),
+        updated=int(result.get("updated", 0)),
+        skipped_duplicates=batch.duplicate_count,
+        pii_scrubbed=sum(bool(row.normalized_data.get("pii_scrubbed")) for row in rows),
+        dashboard=dashboard,
     )
 
 
@@ -165,3 +110,98 @@ def get_job_market_dashboard(
         posted_from=posted_from,
         posted_to=posted_to,
     )
+
+
+def _batch_payload(service: JobImportService, batch, *, preview_only: bool = False) -> dict:
+    rows = service.rows(batch.id)
+    if preview_only:
+        rows = rows[:20]
+    return {
+        "id": batch.id, "job_id": batch.job_id, "job_name": batch.job_name,
+        "filename": batch.filename, "status": batch.status, "headers": batch.headers,
+        "field_mapping": batch.field_mapping, "total_rows": batch.total_rows,
+        "success_count": batch.success_count, "failed_count": batch.failed_count,
+        "duplicate_count": batch.duplicate_count, "filtered_count": batch.filtered_count,
+        "result": batch.result,
+        "rows": [{
+            "row_number": row.row_number, "status": row.status,
+            "normalized_data": row.normalized_data, "errors": row.errors,
+            "warnings": row.warnings, "posting_id": row.posting_id,
+        } for row in rows],
+    }
+
+
+@import_router.post("", response_model=JobImportBatchRead, status_code=201, summary="上传岗位文件并创建暂存批次")
+async def create_job_import(
+    file: UploadFile = File(...),
+    job_id: str = Form(...),
+    job_name: str = Form(...),
+    db: Session = Depends(get_db),
+) -> dict:
+    service = JobImportService(db)
+    batch = service.create(filename=file.filename or "postings.csv", content=await file.read(), job_id=job_id, job_name=job_name)
+    db.commit()
+    return _batch_payload(service, batch, preview_only=True)
+
+
+@import_router.patch("/{batch_id}/mapping", response_model=JobImportBatchRead)
+def update_job_import_mapping(batch_id: str, payload: JobImportMappingUpdate, db: Session = Depends(get_db)) -> dict:
+    service = JobImportService(db)
+    batch = service.update_mapping(batch_id, payload.mapping)
+    db.commit()
+    return _batch_payload(service, batch, preview_only=True)
+
+
+@import_router.get("/{batch_id}/preview", response_model=JobImportBatchRead)
+def preview_job_import(batch_id: str, db: Session = Depends(get_db)) -> dict:
+    service = JobImportService(db)
+    return _batch_payload(service, service.get(batch_id), preview_only=True)
+
+
+@import_router.post("/{batch_id}/confirm", response_model=JobImportBatchRead)
+def confirm_job_import(batch_id: str, db: Session = Depends(get_db)) -> dict:
+    service = JobImportService(db)
+    try:
+        batch = service.confirm(batch_id)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return _batch_payload(service, batch)
+
+
+@import_router.get("/{batch_id}/result", response_model=JobImportBatchRead)
+def get_job_import_result(batch_id: str, db: Session = Depends(get_db)) -> dict:
+    service = JobImportService(db)
+    return _batch_payload(service, service.get(batch_id))
+
+
+@router.get("/{job_id}/postings", response_model=list[JobPostingRead])
+def list_job_postings(
+    job_id: str, offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    postings = list(db.execute(select(JobPosting).options(selectinload(JobPosting.skills)).where(JobPosting.job_id == job_id).order_by(JobPosting.posted_at.desc(), JobPosting.id).offset(offset).limit(limit)).scalars())
+    return [{
+        "id": p.id, "job_id": p.job_id, "title": p.title, "company_name": p.company_name,
+        "company_type": p.company_type, "city": p.city, "raw_text": p.raw_text,
+        "source_name": p.source_name, "source_url": p.source_url, "posted_at": p.posted_at,
+        "data_flag": p.data_flag, "pii_scrubbed": p.pii_scrubbed,
+        "source_record_id": p.source_record_id,
+        "skills": [{"skill_code": s.skill_code, "evidence_span": s.evidence_span, "confidence": s.confidence} for s in p.skills],
+    } for p in postings]
+
+
+@router.get("/{job_id}/postings/{posting_id}", response_model=JobPostingRead)
+def get_job_posting(job_id: str, posting_id: str, db: Session = Depends(get_db)) -> dict:
+    from app.core.errors import NotFoundError
+    p = db.execute(select(JobPosting).options(selectinload(JobPosting.skills)).where(JobPosting.job_id == job_id, JobPosting.id == posting_id)).scalar_one_or_none()
+    if p is None:
+        raise NotFoundError(f"未找到岗位记录：{posting_id}")
+    return {
+        "id": p.id, "job_id": p.job_id, "title": p.title, "company_name": p.company_name,
+        "company_type": p.company_type, "city": p.city, "raw_text": p.raw_text,
+        "source_name": p.source_name, "source_url": p.source_url, "posted_at": p.posted_at,
+        "data_flag": p.data_flag, "pii_scrubbed": p.pii_scrubbed, "source_record_id": p.source_record_id,
+        "skills": [{"skill_code": s.skill_code, "evidence_span": s.evidence_span, "confidence": s.confidence} for s in p.skills],
+    }

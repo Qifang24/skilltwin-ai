@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.core.db import utcnow
@@ -421,6 +421,17 @@ class CompetencyGraphService:
         graph.status = GraphStatus.APPROVED
         graph.approved_by = approved_by
         graph.approved_at = utcnow()
+        if previous:
+            from app.models.curriculum import OptimizationRun
+            self._db.execute(
+                update(OptimizationRun)
+                .where(
+                    OptimizationRun.job_id == graph.job_id,
+                    OptimizationRun.graph_id != graph_id,
+                    OptimizationRun.is_stale.is_(False),
+                )
+                .values(is_stale=True)
+            )
         self._db.flush()
 
         logger.info(

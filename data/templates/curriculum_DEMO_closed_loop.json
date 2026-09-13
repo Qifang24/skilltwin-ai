@@ -1,0 +1,81 @@
+{
+  "_comment": "DEMO FIXTURE ONLY：以下课程、证据和映射均为合成内容，用于演示结构化导入与闭环操作，不代表真实学校课程或已验证结论。",
+  "data_flag": "DEMO",
+  "plan": {
+    "id": "demo_closed_loop_2026",
+    "name": "闭环演示培养方案（合成样例）",
+    "profession": "人工智能技术应用（演示）",
+    "version": "DEMO-2026",
+    "source_doc_id": "demo_document_closed_loop",
+    "source_name": "合成课程资料（非真实来源）",
+    "source_url": null,
+    "license_note": "DEMO 合成内容，仅供本地管线演示，不得用于对外分析。",
+    "is_partial": true
+  },
+  "courses": [
+    {
+      "id": "demo_course_data_quality",
+      "name": "数据质量与标注实践（合成样例）",
+      "course_code": "DEMO-AI-101",
+      "category": "专业核心课程",
+      "total_hours": 48,
+      "objectives": "课程目标：理解数据质量指标并能按规则完成标注复核。",
+      "description": "课程简介：通过合成项目练习数据整理、标注和质量检查。",
+      "teaching_content": "教学内容：数据采集、数据清洗、标注规范与质量抽检。",
+      "knowledge_points": "知识点：数据组织、数据清洗、标注一致性。",
+      "practical_content": "实践内容：使用演示数据集完成分类标注并提交质量记录。",
+      "learning_outcomes": "学习成果：能够依据给定规范完成标注并解释抽检结果。",
+      "source_chunk_id": "demo_document_closed_loop#course-1",
+      "source_page": "1",
+      "source_quote": "课程名称：数据质量与标注实践（合成样例）"
+    },
+    {
+      "id": "demo_course_prompt",
+      "name": "提示词与结果评测（合成样例）",
+      "course_code": "DEMO-AI-102",
+      "category": "专业拓展课程",
+      "total_hours": 32,
+      "objectives": "课程目标：理解提示词结构并能依据评价标准记录模型输出问题。",
+      "description": "课程简介：使用合成对话样例练习提示词设计和结果评测。",
+      "teaching_content": "教学内容：提示词要素、样例构造、结果评测与反馈。",
+      "knowledge_points": "知识点：逻辑表达、评价标准、问题分类。",
+      "practical_content": "实践内容：设计一组演示提示词并填写评测表。",
+      "learning_outcomes": "学习成果：能够按给定标准完成结果分类和改进记录。",
+      "source_chunk_id": "demo_document_closed_loop#course-2",
+      "source_page": "2",
+      "source_quote": "课程名称：提示词与结果评测（合成样例）"
+    }
+  ],
+  "coverage": [
+    {
+      "course_id": "demo_course_data_quality",
+      "skill_code": "data.cleaning",
+      "coverage_strength": 2,
+      "coverage_status": "covered",
+      "source_chunk_id": "demo_document_closed_loop#course-1",
+      "source_page": "1",
+      "evidence_quote": "教学内容：数据采集、数据清洗、标注规范与质量抽检。",
+      "origin": "teacher_entered",
+      "confidence": 1.0,
+      "reason": "合成课程内容明确提及数据清洗。",
+      "teacher_confirmed": true,
+      "edited_by": "demo_teacher"
+    },
+    {
+      "course_id": "demo_course_prompt",
+      "skill_code": "soft.communication",
+      "coverage_strength": 1,
+      "coverage_status": "partial",
+      "source_chunk_id": "demo_document_closed_loop#course-2",
+      "source_page": "2",
+      "evidence_quote": "知识点：逻辑表达、评价标准、问题分类。",
+      "origin": "rule",
+      "confidence": 0.6,
+      "reason": "合成课程内容部分涉及逻辑表达，待教师复核。",
+      "teacher_confirmed": false,
+      "edited_by": null
+    }
+  ],
+  "coverage_status_examples": ["covered", "partial", "uncovered"],
+  "uncovered_skills": ["仅用于演示三态标签，不是对任何真实课程的判断"]
+}

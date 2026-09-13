@@ -1,4 +1,10 @@
 import {
+  BarChartOutlined,
+  CheckCircleOutlined,
+  FormOutlined,
+  UserOutlined,
+} from '@ant-design/icons'
+import {
   Alert,
   App,
   Button,
@@ -20,6 +26,7 @@ import {
 } from 'antd'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import {
   completeUserTestSession,
@@ -36,6 +43,7 @@ import type {
   UserTestSession,
   UserTestTask,
 } from '@/types/userTesting'
+import { PageHero } from '@/components/PageHero'
 
 const { Title, Paragraph } = Typography
 
@@ -158,6 +166,7 @@ function SessionDetail({ session }: { session: UserTestSession }) {
 }
 
 export function UserTestingPage() {
+  const navigate = useNavigate()
   const { message } = App.useApp()
   const queryClient = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
@@ -200,21 +209,33 @@ export function UserTestingPage() {
   const report = reportQuery.data
 
   return (
-    <Space orientation="vertical" size={20} style={{ width: '100%' }}>
-      <div>
-        <Title level={2}>真实用户测试</Title>
-        <Paragraph type="secondary">使用统一脚本记录真实参与者的任务表现与反馈；报告只汇总已完成记录，不推断缺失数据。</Paragraph>
-      </div>
+    <Space className="admin-user-testing-page" orientation="vertical" size={20} style={{ width: '100%' }}>
+      <PageHero
+        eyebrow="管理端 · 真实用户验证"
+        title="真实用户测试"
+        description="用统一脚本记录真实参与者的任务表现与反馈，沉淀可复核的产品验证证据。"
+        meta={<div className="admin-hero-meta"><span><UserOutlined /> 仅保存匿名信息</span><span><CheckCircleOutlined /> 完成记录才计入报告</span></div>}
+        actions={<Button onClick={() => navigate('/admin')}>← 返回管理端</Button>}
+      />
+
+      <Card className="admin-test-intro" bordered={false}>
+        <div className="admin-test-intro__icon"><FormOutlined /></div>
+        <div>
+          <Title level={4}>把“好不好用”变成可追溯的证据</Title>
+          <Paragraph type="secondary">先创建匿名会话，再逐项记录任务结果、达成度和易用性。参与者可以是教师或学生，记录完成后即可查看汇总。</Paragraph>
+        </div>
+      </Card>
 
       {report?.warnings.map((warning) => <Alert key={warning} type="warning" showIcon description={warning} />)}
       <Row gutter={[16, 16]}>
-        <Col xs={12} md={6}><Card><Statistic title="已完成会话" value={report?.completed_sessions ?? 0} /></Card></Col>
-        <Col xs={12} md={6}><Card><Statistic title="任务完成率" value={report?.overall_completion_rate == null ? '—' : `${(report.overall_completion_rate * 100).toFixed(0)}%`} /></Card></Col>
-        <Col xs={12} md={6}><Card><Statistic title="平均达成度" value={report?.average_accuracy ?? '—'} suffix={report?.average_accuracy == null ? undefined : '/ 5'} /></Card></Col>
-        <Col xs={12} md={6}><Card><Statistic title="平均易用性" value={report?.average_ease_of_use ?? '—'} suffix={report?.average_ease_of_use == null ? undefined : '/ 5'} /></Card></Col>
+        <Col xs={12} md={6}><Card className="admin-stat-card admin-stat-card--blue"><Statistic prefix={<UserOutlined />} title="已完成会话" value={report?.completed_sessions ?? 0} /></Card></Col>
+        <Col xs={12} md={6}><Card className="admin-stat-card admin-stat-card--green"><Statistic prefix={<CheckCircleOutlined />} title="任务完成率" value={report?.overall_completion_rate == null ? '—' : `${(report.overall_completion_rate * 100).toFixed(0)}%`} /></Card></Col>
+        <Col xs={12} md={6}><Card className="admin-stat-card admin-stat-card--purple"><Statistic prefix={<BarChartOutlined />} title="平均达成度" value={report?.average_accuracy ?? '—'} suffix={report?.average_accuracy == null ? undefined : '/ 5'} /></Card></Col>
+        <Col xs={12} md={6}><Card className="admin-stat-card admin-stat-card--orange"><Statistic prefix={<BarChartOutlined />} title="平均易用性" value={report?.average_ease_of_use ?? '—'} suffix={report?.average_ease_of_use == null ? undefined : '/ 5'} /></Card></Col>
       </Row>
 
       <Card
+        className="admin-section-card"
         title="测试会话"
         extra={<Button type="primary" onClick={() => setCreateOpen(true)}>新建匿名会话</Button>}
       >
@@ -235,9 +256,9 @@ export function UserTestingPage() {
         />
       </Card>
 
-      {selectedSession ? <SessionDetail session={selectedSession} /> : <Empty description="选择一条会话后可记录每个测试任务的实际结果" />}
+      {selectedSession ? <div className="admin-session-detail"><SessionDetail session={selectedSession} /></div> : <Card className="admin-empty-card"><Empty description="选择一条会话后可记录每个测试任务的实际结果" /></Card>}
 
-      <Card title="汇总明细">
+      <Card className="admin-section-card" title="汇总明细">
         {report?.tasks.length ? <Table rowKey="task_code" size="small" pagination={false} dataSource={report.tasks} columns={[{ title: '测试任务', dataIndex: 'title' }, { title: '记录数', dataIndex: 'response_count', width: 90 }, { title: '完成率', render: (_: unknown, row) => row.completion_rate == null ? '—' : `${(row.completion_rate * 100).toFixed(0)}%` }, { title: '达成度', dataIndex: 'average_accuracy', render: (value) => value == null ? '—' : `${value} / 5` }, { title: '易用性', dataIndex: 'average_ease_of_use', render: (value) => value == null ? '—' : `${value} / 5` }]} /> : <Empty description="完成真实用户测试后，这里才会显示汇总数据。" />}
         <Paragraph type="secondary" style={{ marginTop: 16 }}>{report?.reasoning_summary}</Paragraph>
       </Card>

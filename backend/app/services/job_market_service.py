@@ -11,7 +11,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.enums import DataFlag, SkillStatus
@@ -77,9 +77,11 @@ class JobMarketService:
             delete(JobPostingSkill).where(JobPostingSkill.posting_id == posting.id)
         )
         created = 0
+        declared_skills = str((posting.extra or {}).get("declared_skills") or "").strip()
+        source_text = posting.raw_text + (f"\n技能要求：{declared_skills}" if declared_skills else "")
         for skill in skills:
             for term in self._terms_for_skill(skill):
-                match = re.search(re.escape(term), posting.raw_text, flags=re.IGNORECASE)
+                match = re.search(re.escape(term), source_text, flags=re.IGNORECASE)
                 if match is None:
                     continue
                 self._db.add(
@@ -87,7 +89,7 @@ class JobMarketService:
                         posting_id=posting.id,
                         skill_code=skill.skill_code,
                         evidence_span=self._sentence_span(
-                            posting.raw_text, match.start(), match.end()
+                            source_text, match.start(), match.end()
                         ),
                         extractor=RULE_EXTRACTOR,
                         extractor_version="2026-08",
@@ -216,6 +218,15 @@ class JobMarketService:
                 window_end=end,
                 now=now,
             )
+        # A rebuilt market snapshot invalidates prior curriculum recommendations.
+        # Keep the historical teacher decisions, but make their stale state
+        # explicit until the teacher reruns coverage analysis and optimization.
+        from app.models.curriculum import OptimizationRun
+        self._db.execute(
+            update(OptimizationRun)
+            .where(OptimizationRun.job_id == job_id, OptimizationRun.is_stale.is_(False))
+            .values(is_stale=True)
+        )
         self._db.flush()
 
         dashboard = self.dashboard(job_id)
