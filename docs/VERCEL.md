@@ -31,15 +31,15 @@
 | `VECTOR_STORE` | `sql`；必需 |
 | `FILE_STORAGE` | `database`；必需 |
 | `EMBEDDING_PROVIDER` | `openai_compat`；必需，Vercel 不加载本地 BGE/torch |
-| `EMBEDDING_MODEL` | `openai/text-embedding-3-small`（Vercel AI Gateway 模型 ID） |
+| `EMBEDDING_MODEL` | `openai/text-embedding-3-small`（OpenRouter 模型 ID） |
 | `EMBEDDING_DIM` | `1536` |
-| `EMBEDDING_BASE_URL` | `https://ai-gateway.vercel.sh/v1` |
-| `EMBEDDING_API_KEY` | 云端使用 Vercel 自动注入的 OIDC 时可不填；连接其他 embedding 服务时才填写 |
+| `EMBEDDING_BASE_URL` | `https://openrouter.ai/api/v1` |
+| `EMBEDDING_API_KEY` | 云端同为 OpenRouter 时可复用后端的 `LLM_API_KEY`；本地建立索引时临时提供，勿写入源码 |
 | `LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | 聊天/生成模型配置；仅后端使用 |
 | `VITE_UPLOAD_MAX_MB` | `4`；与 Vercel Function 的请求体限制相配 |
-| `RETRIEVE_DENSE_TOP_K` | `0`；当前先用数据库 BM25 关键词检索，避免未开通 AI Gateway 时请求失败 |
+| `RETRIEVE_DENSE_TOP_K` | `20`；向量与数据库 BM25 关键词检索并用 |
 
-上述 embedding 设置预留给 [Vercel AI Gateway](https://vercel.com/docs/ai-gateway/sdks-and-apis/python) 的 OpenAI embedding 模型，云端会自动用 `VERCEL_OIDC_TOKEN` 鉴权。当前账户还未满足 Gateway 的信用卡验证要求，因此先将 `RETRIEVE_DENSE_TOP_K=0`，使用数据库 BM25 关键词检索，不调用 Gateway。若以后要启用语义向量检索，完成 Gateway 验证后运行 `scripts/bootstrap_vercel.py --step index`，再把 `RETRIEVE_DENSE_TOP_K` 改为 `20` 并重新部署。Gateway 的费用与免费额度以 [官方价格页](https://vercel.com/docs/ai-gateway/pricing) 为准。所有真正的密钥应在 Vercel 中设为 Sensitive。
+语义检索直接调用 [OpenRouter Embeddings API](https://openrouter.ai/docs/api/api-reference/embeddings/create-embeddings)，无需开通 Vercel AI Gateway；聊天模型与 embedding 模型是两个独立配置。先运行 `scripts/bootstrap_vercel.py --step index` 为已有知识块建立向量，再设置 `RETRIEVE_DENSE_TOP_K=20` 并重新部署。云端运行期可复用 Vercel Secret 中的 OpenRouter `LLM_API_KEY`，本地构建时需临时传入 `EMBEDDING_API_KEY`。所有真正的密钥应在 Vercel 中设为 Sensitive，切勿写入 Git 或聊天记录。
 
 ## 4. 初始化数据库和数据
 
@@ -53,6 +53,11 @@ python3 -m venv .venv
 npx vercel@latest link --yes --project skilltwin-ai --scope chien-bots-projects
 npx vercel@latest env run -e production -- .venv/bin/python scripts/bootstrap_vercel.py --skip-index
 ```
+
+知识数据准备好后，在本机临时提供 OpenRouter 的 `EMBEDDING_API_KEY`，再运行
+`npx vercel@latest env run -e production -- .venv/bin/python scripts/bootstrap_vercel.py --step index`。
+Vercel CLI 不会把已标记为 Secret 的 `LLM_API_KEY` 下载到本机，所以构建索引时需要这个临时变量；
+云端检索则继续使用 Vercel 中的 Secret。先核对所有知识块已有向量，再将 `RETRIEVE_DENSE_TOP_K` 设为 `20`。
 
 脚本会读取仓库中的 `knowledge/` PDF。首次运行前，先按 `knowledge/manifest.json` 的 `source_url` 下载并核对每份 PDF，保存到相应 `knowledge/...` 路径。PDF 被 `.gitignore` 排除，不会进入 Vercel Function；解析后的知识块与向量会存到 Postgres。脚本可重复运行，已导入且未变化的文档会跳过。
 

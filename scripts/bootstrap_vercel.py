@@ -3,8 +3,8 @@
 Run with ``vercel env run -e production -- .venv/bin/python
 scripts/bootstrap_vercel.py``. The CLI cannot reveal Sensitive project variables
 locally and represents them as placeholders, so this runner removes those values
-before importing application settings. The Marketplace DATABASE_URL and a fresh
-VERCEL_OIDC_TOKEN remain available for migrations and AI Gateway embeddings.
+before importing application settings. The Marketplace DATABASE_URL remains
+available; for OpenRouter index builds, pass EMBEDDING_API_KEY temporarily.
 """
 
 from __future__ import annotations
@@ -27,20 +27,25 @@ def main() -> int:
     if not env.get("DATABASE_URL", "").startswith(("postgres://", "postgresql://", "postgresql+psycopg://")):
         print("缺少 Vercel Marketplace 提供的 PostgreSQL DATABASE_URL。", file=sys.stderr)
         return 1
-    if (args.step in ("all", "index") and not args.skip_index
-            and not (env.get("AI_GATEWAY_API_KEY") or env.get("VERCEL_OIDC_TOKEN"))):
-        print("缺少 AI Gateway 凭证；请通过 Vercel env run 执行，或在本地设置 AI_GATEWAY_API_KEY。", file=sys.stderr)
-        return 1
+    embedding_base_url = env.get("EMBEDDING_BASE_URL", "https://ai-gateway.vercel.sh/v1").rstrip("/")
+    if args.step in ("all", "index") and not args.skip_index:
+        if embedding_base_url == "https://ai-gateway.vercel.sh/v1":
+            credential_present = bool(env.get("EMBEDDING_API_KEY") or env.get("AI_GATEWAY_API_KEY") or env.get("VERCEL_OIDC_TOKEN"))
+        else:
+            credential_present = bool(env.get("EMBEDDING_API_KEY") or env.get("LLM_API_KEY"))
+        if not credential_present:
+            print("缺少 embedding 服务凭证；本地构建索引请临时提供 EMBEDDING_API_KEY。", file=sys.stderr)
+            return 1
 
     env.update({
         "VERCEL": "1",
         "VECTOR_STORE": "sql",
         "FILE_STORAGE": "database",
         "EMBEDDING_PROVIDER": "openai_compat",
-        "EMBEDDING_BASE_URL": "https://ai-gateway.vercel.sh/v1",
-        "EMBEDDING_MODEL": "openai/text-embedding-3-small",
-        "EMBEDDING_DIM": "1536",
     })
+    env.setdefault("EMBEDDING_BASE_URL", embedding_base_url)
+    env.setdefault("EMBEDDING_MODEL", "openai/text-embedding-3-small")
+    env.setdefault("EMBEDDING_DIM", "1536")
     py = sys.executable
     jobs = [
         ("migrate", "数据库迁移", [py, "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"]),
