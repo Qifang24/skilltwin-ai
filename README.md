@@ -57,7 +57,7 @@
 ```bash
 # 在项目根目录
 python -m venv .venv --system-site-packages
-.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
+.venv/Scripts/python.exe -m pip install -r backend/requirements-local.txt
 
 # 配置环境变量
 cp .env.example .env        # 然后编辑 .env 填入你的 LLM_API_KEY
@@ -112,6 +112,7 @@ npm run build                                # tsc -b && vite build
 
 项目提供同源 Nginx + FastAPI 的 Docker Compose 部署，运行数据持久化在 Docker named volume，
 不会把 API Key 编译进前端。详细步骤、备份和云端约束见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
+若要将 React 前端与 FastAPI 后端一起部署到 Vercel，请按 [Vercel 完整部署指南](docs/VERCEL.md) 配置托管 Postgres、环境变量与初始数据。
 
 ```powershell
 Copy-Item .env.example .env

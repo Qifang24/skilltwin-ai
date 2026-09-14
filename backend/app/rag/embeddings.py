@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from abc import ABC, abstractmethod
 from functools import lru_cache
 
@@ -21,6 +22,7 @@ from app.core.errors import ConfigurationError
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+AI_GATEWAY_URL = "https://ai-gateway.vercel.sh/v1"
 
 #: bge 系列建议给「短查询检索长文档」的查询加指令前缀，可提升召回。
 #: 文档侧不加。
@@ -143,8 +145,15 @@ class OpenAICompatEmbeddingProvider(EmbeddingProvider):
         model: str | None = None,
         dim: int | None = None,
     ) -> None:
-        self._api_key = api_key if api_key is not None else settings.llm_api_key
-        self._base_url = base_url if base_url is not None else settings.llm_base_url
+        self._base_url = base_url if base_url is not None else (settings.embedding_base_url or settings.llm_base_url)
+        if api_key is not None:
+            self._api_key = api_key
+        elif self._base_url.rstrip("/") == AI_GATEWAY_URL:
+            # AI Gateway 的凭证和外部 LLM 凭证不可混用。Vercel 自动注入 OIDC；
+            # 本地构建索引时可单独设置 AI_GATEWAY_API_KEY。
+            self._api_key = settings.embedding_api_key or settings.ai_gateway_api_key or os.getenv("VERCEL_OIDC_TOKEN", "")
+        else:
+            self._api_key = settings.embedding_api_key or settings.llm_api_key
         self._model = model or settings.embedding_model
         self._dim = dim or settings.embedding_dim
         self._client = None
@@ -158,7 +167,7 @@ class OpenAICompatEmbeddingProvider(EmbeddingProvider):
             return np.zeros((0, self._dim), dtype=np.float32)
         if self._client is None:
             if not self._api_key:
-                raise ConfigurationError("使用 API embedding 需要配置 LLM_API_KEY")
+                raise ConfigurationError("使用 API embedding 需要配置对应服务的 API Key，或在 Vercel 使用 AI Gateway OIDC")
             from openai import OpenAI
 
             self._client = OpenAI(api_key=self._api_key, base_url=self._base_url)

@@ -35,7 +35,7 @@ class TimestampMixin:
 
 
 def _build_engine() -> Engine:
-    kwargs: dict = {"echo": settings.debug, "future": True}
+    kwargs: dict = {"echo": settings.debug, "future": True, "pool_pre_ping": True}
     if settings.is_sqlite:
         # FastAPI 的同步依赖会在线程池中执行，需允许跨线程使用连接
         kwargs["connect_args"] = {"check_same_thread": False}

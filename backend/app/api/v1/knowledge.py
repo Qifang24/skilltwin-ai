@@ -11,10 +11,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.db import get_db
 from app.core.enums import SourceType
 from app.core.errors import NotFoundError
-from app.models.knowledge import KnowledgeDoc
+from app.models.knowledge import KnowledgeChunk, KnowledgeDoc
 from app.rag.retriever import HybridRetriever
 from app.schemas.common import Page
 
@@ -85,7 +86,7 @@ def _citation_label(hit) -> str:  # noqa: ANN001
     response_model=SearchResponse,
     summary="知识库混合检索",
     description=(
-        "dense（本地 BGE 向量）+ BM25（jieba 分词）双通路，经 RRF 融合。"
+        "可用时融合 dense 向量检索与 BM25（jieba 分词）关键词检索。"
         "返回中的 dense_rank / sparse_rank 可用于排查召回来源。"
     ),
 )
@@ -119,7 +120,11 @@ def search(payload: SearchRequest, db: Session = Depends(get_db)) -> SearchRespo
             )
             for c in chunks
         ],
-        total_indexed=retriever.store.count(),
+        total_indexed=(
+            db.scalar(select(func.count()).select_from(KnowledgeChunk))
+            if settings.vector_store == "sql" and settings.retrieve_dense_top_k <= 0
+            else retriever.store.count()
+        ),
     )
 
 

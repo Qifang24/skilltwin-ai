@@ -41,7 +41,7 @@ def main() -> int:
     store = build_vector_store()
 
     print(f"Embedding : {settings.embedding_model} ({embedder.name})")
-    print(f"向量库    : {settings.chroma_dir}")
+    print(f"向量库    : {settings.vector_store if settings.vector_store == 'sql' else settings.chroma_dir}")
 
     if args.rebuild:
         store.reset()
@@ -99,10 +99,13 @@ def main() -> int:
 
         # ---------- BM25 索引 ----------
         # BM25 构建很快，每次全量重建，避免增量带来的不一致
-        bm25 = BM25Index()
-        bm25.build([c.id for c in chunks], [c.text for c in chunks])
-        bm25.save(BM25_INDEX_PATH)
-        print(f"BM25 索引完成：{bm25.size} 块 → {BM25_INDEX_PATH.name}")
+        if settings.vector_store != "sql":
+            bm25 = BM25Index()
+            bm25.build([c.id for c in chunks], [c.text for c in chunks])
+            bm25.save(BM25_INDEX_PATH)
+            print(f"BM25 索引完成：{bm25.size} 块 → {BM25_INDEX_PATH.name}")
+        else:
+            print("BM25 将在 Vercel Function 中从数据库知识块重建")
 
     print(f"\n向量库现有 {store.count()} 条")
     return 0

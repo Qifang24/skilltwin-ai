@@ -8,9 +8,11 @@ from __future__ import annotations
 
 from enum import Enum
 from functools import lru_cache
+import os
 from pathlib import Path
+from typing import Literal
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # .../backend/app/core/config.py -> challenge_cup/
@@ -47,6 +49,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=(PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
+        env_ignore_empty=True,
         case_sensitive=False,
         extra="ignore",
         protected_namespaces=(),
@@ -68,6 +71,8 @@ class Settings(BaseSettings):
     knowledge_dir: Path = PROJECT_ROOT / "knowledge"
     seed_dir: Path = PROJECT_ROOT / "data" / "seed"
     chroma_dir: Path = PROJECT_ROOT / "data" / "chroma"
+    vector_store: Literal["chroma", "sql"] = "chroma"
+    file_storage: Literal["local", "database"] = "local"
 
     # ---------- 数据库 ----------
     database_url: str = ""  # 空则由 data_dir 推导，见 validator
@@ -110,6 +115,9 @@ class Settings(BaseSettings):
     embedding_device: str = "auto"  # auto | cuda | cpu
     embedding_dim: int = 512  # bge-small-zh-v1.5 输出维度
     embedding_batch_size: int = 32
+    embedding_api_key: str = ""
+    embedding_base_url: str = ""
+    ai_gateway_api_key: str = ""  # 本地索引构建可用；Vercel 运行期优先使用 OIDC
 
     # ---------- RAG ----------
     chunk_size: int = 512
@@ -123,10 +131,26 @@ class Settings(BaseSettings):
     @classmethod
     def _default_sqlite_url(cls, v: str) -> str:
         if v:
+            if v.startswith("postgres://"):
+                return "postgresql+psycopg://" + v[len("postgres://"):]
+            if v.startswith("postgresql://"):
+                return "postgresql+psycopg://" + v[len("postgresql://"):]
             return v
         db_path = PROJECT_ROOT / "data" / "skilltwin.db"
         # SQLAlchemy 的 sqlite URL 在 Windows 上需要正斜杠
         return f"sqlite:///{db_path.as_posix()}"
+
+    @model_validator(mode="after")
+    def _validate_vercel_storage(self) -> "Settings":
+        if os.getenv("VERCEL") == "1":
+            if self.is_sqlite or self.vector_store != "sql" or self.file_storage != "database":
+                raise ValueError(
+                    "Vercel requires DATABASE_URL (Postgres), VECTOR_STORE=sql, "
+                    "and FILE_STORAGE=database; local files are not persistent"
+                )
+            if self.embedding_provider == EmbeddingProviderName.LOCAL_BGE:
+                raise ValueError("Vercel requires EMBEDDING_PROVIDER=openai_compat")
+        return self
 
     @property
     def is_sqlite(self) -> bool:
@@ -134,6 +158,8 @@ class Settings(BaseSettings):
 
     def ensure_dirs(self) -> None:
         """启动时保证运行期目录存在（这些目录不进 git）。"""
+        if self.file_storage == "database" and self.vector_store == "sql":
+            return
         for d in (self.data_dir, self.seed_dir, self.chroma_dir, self.knowledge_dir):
             d.mkdir(parents=True, exist_ok=True)
 

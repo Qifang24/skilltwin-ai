@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -36,7 +38,11 @@ def _check_llm() -> ComponentHealth:
             return ComponentHealth(
                 name="llm",
                 ok=False,
-                detail="LLM_API_KEY 未配置，请复制 .env.example 为 .env 并填入",
+                detail=(
+                    "LLM_API_KEY 未配置，请在 Vercel 项目环境变量中填写"
+                    if os.getenv("VERCEL") == "1"
+                    else "LLM_API_KEY 未配置，请复制 .env.example 为 .env 并填入"
+                ),
             )
         return ComponentHealth(
             name="llm", ok=True, detail=f"{settings.llm_model} @ {settings.llm_base_url}"
@@ -79,6 +85,18 @@ def _check_llm() -> ComponentHealth:
 
 def _check_embedding() -> ComponentHealth:
     """探测运行环境，不实际加载模型（加载需数秒且占显存）。"""
+    if settings.retrieve_dense_top_k <= 0:
+        return ComponentHealth(name="embedding", ok=True, detail="向量检索暂停；数据库 BM25 检索可用")
+    if settings.embedding_provider.value == "openai_compat":
+        base_url = settings.embedding_base_url or settings.llm_base_url
+        if base_url.rstrip("/") == "https://ai-gateway.vercel.sh/v1":
+            configured = bool(settings.embedding_api_key or settings.ai_gateway_api_key or os.getenv("VERCEL_OIDC_TOKEN"))
+        else:
+            configured = bool(settings.embedding_api_key or settings.llm_api_key)
+        return ComponentHealth(
+            name="embedding", ok=configured,
+            detail=f"{settings.embedding_model} @ {base_url}" if configured else "Embedding 凭证未配置",
+        )
     try:
         import torch
 
@@ -98,6 +116,14 @@ def _check_embedding() -> ComponentHealth:
 
 
 def _check_vector_store() -> ComponentHealth:
+    if settings.vector_store == "sql":
+        try:
+            from app.rag.vector_store import build_vector_store
+
+            count = build_vector_store().count()
+            return ComponentHealth(name="vector_store", ok=True, detail=f"SQL 向量索引可用（{count} 条）")
+        except Exception as exc:
+            return ComponentHealth(name="vector_store", ok=False, detail=str(exc))
     try:
         import chromadb  # noqa: F401
 

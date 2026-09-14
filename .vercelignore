@@ -1,0 +1,12 @@
+.vercel/
+frontend/node_modules/
+frontend/dist/
+docs/
+deploy/
+scripts/
+data/
+knowledge/
+backend/tests/
+backend/alembic/
+backend/requirements-local.txt
+.venv/

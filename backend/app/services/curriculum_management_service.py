@@ -5,7 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import tempfile
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
@@ -29,6 +31,7 @@ from app.rag.chunker import chunk_pages
 from app.rag.loader import load_document
 
 MAX_BYTES = 10 * 1024 * 1024
+SERVERLESS_MAX_BYTES = 4 * 1024 * 1024
 COURSE_FIELDS = ("objectives", "description", "teaching_content", "knowledge_points", "practical_content", "learning_outcomes")
 LABELS = {
     "课程目标": "objectives", "目标": "objectives", "课程简介": "description", "简介": "description",
@@ -184,19 +187,23 @@ class CurriculumManagementService:
     def create_import(self, *, filename: str, content: bytes, source_name: str, source_url: str | None, license_note: str | None) -> CurriculumImportBatch:
         if not content:
             raise ValidationError("上传文件为空。")
-        if len(content) > MAX_BYTES:
-            raise ValidationError("课程文件超过 10MB 限制。")
+        limit = SERVERLESS_MAX_BYTES if settings.file_storage == "database" else MAX_BYTES
+        if len(content) > limit:
+            raise ValidationError(f"课程文件超过 {limit // (1024 * 1024)}MB 限制。")
         suffix = Path(filename).suffix.lower()
         if suffix not in {".pdf", ".docx", ".txt", ".json"}:
             raise ValidationError("课程导入仅支持 PDF、DOCX、TXT 和结构化 JSON。")
         file_hash = hashlib.sha256(content).hexdigest()
-        storage = settings.data_dir / "curriculum_uploads"
-        storage.mkdir(parents=True, exist_ok=True)
         batch_id = f"cib_{uuid.uuid4().hex}"
-        path = storage / f"{batch_id}{suffix}"
-        path.write_bytes(content)
+        path = None
+        if settings.file_storage != "database":
+            storage = settings.data_dir / "curriculum_uploads"
+            storage.mkdir(parents=True, exist_ok=True)
+            path = storage / f"{batch_id}{suffix}"
+            path.write_bytes(content)
         batch = CurriculumImportBatch(
-            id=batch_id, filename=filename, file_hash=file_hash, storage_path=str(path),
+            id=batch_id, filename=filename, file_hash=file_hash,
+            storage_path=str(path) if path else "", file_content=content if path is None else None,
             source_name=source_name, source_url=source_url, license_note=license_note,
         )
         self.db.add(batch)
@@ -218,13 +225,26 @@ class CurriculumManagementService:
     def drafts(self, batch_id: str) -> list[CurriculumDraftCourse]:
         return list(self.db.execute(select(CurriculumDraftCourse).where(CurriculumDraftCourse.batch_id == batch_id).order_by(CurriculumDraftCourse.row_number)).scalars())
 
+    @contextmanager
+    def _import_path(self, batch: CurriculumImportBatch):
+        if batch.file_content is None:
+            yield Path(batch.storage_path)
+            return
+        # Document parsers require a filename. This copy is request-scoped; the
+        # original upload remains durable in SQL across function invocations.
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / f"source{Path(batch.filename).suffix.lower()}"
+            path.write_bytes(batch.file_content)
+            yield path
+
     def parse_import(self, batch: CurriculumImportBatch) -> CurriculumImportBatch:
         if batch.status == "confirmed":
             raise ConflictError("已确认的课程批次不能重新解析。")
         self.db.execute(delete(CurriculumDraftCourse).where(CurriculumDraftCourse.batch_id == batch.id))
         try:
-            content = Path(batch.storage_path).read_bytes()
-            text, courses = _structured_courses(batch.filename, content, Path(batch.storage_path))
+            with self._import_path(batch) as path:
+                content = path.read_bytes()
+                text, courses = _structured_courses(batch.filename, content, path)
             batch.document_text, batch.error_message, batch.status = text, None, "parsed"
             needs_ai = len(courses) == 1 and bool(courses[0][0].get("_needs_ai_structure"))
             if needs_ai and settings.llm_api_key:
@@ -316,7 +336,11 @@ class CurriculumManagementService:
         # Preserve them as teacher/rule mappings instead of silently dropping
         # the evidence during confirmation.
         try:
-            payload = json.loads(Path(batch.storage_path).read_text(encoding="utf-8-sig")) if Path(batch.storage_path).suffix.lower() == ".json" else {}
+            if Path(batch.filename).suffix.lower() == ".json":
+                source = batch.file_content if batch.file_content is not None else Path(batch.storage_path).read_bytes()
+                payload = json.loads(source.decode("utf-8-sig"))
+            else:
+                payload = {}
             for item in (payload.get("coverage", []) if isinstance(payload, dict) else []):
                 course_id = course_ids.get(str(item.get("course_id")))
                 skill_code = str(item.get("skill_code") or "")

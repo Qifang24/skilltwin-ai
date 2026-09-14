@@ -16,9 +16,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY backend/requirements.txt /app/backend/requirements.txt
+COPY backend/requirements.txt backend/requirements-local.txt /app/backend/
 RUN python -m pip install --upgrade pip \
-    && python -m pip install -r /app/backend/requirements.txt
+    && python -m pip install -r /app/backend/requirements-local.txt
 
 COPY backend /app/backend
 COPY scripts /app/scripts

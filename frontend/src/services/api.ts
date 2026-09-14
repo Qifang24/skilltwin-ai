@@ -2,7 +2,7 @@
  * 后端 API 客户端。
  *
  * 开发期通过 vite 代理走相对路径 /api/v1，因此不需要在前端配置后端地址；
- * 部署时若前后端分离，设置 VITE_API_BASE_URL 即可。
+ * Vercel Services 同域部署时仍走相对路径；只有分开部署时才设置 VITE_API_BASE_URL。
  */
 
 import axios, { AxiosError } from 'axios'
@@ -53,6 +53,7 @@ import type {
 } from '@/types/userTesting'
 
 export const API_PREFIX = '/api/v1'
+export const MAX_UPLOAD_MB = Number(import.meta.env.VITE_UPLOAD_MAX_MB ?? 10)
 
 type UnknownRecord = Record<string, unknown>
 interface RawImportRow extends UnknownRecord {
@@ -97,7 +98,7 @@ export function toErrorMessage(error: unknown): string {
       return '请求超时，请稍后重试'
     }
     if (!axiosError.response) {
-      return '无法连接后端服务，请确认 uvicorn 已在 127.0.0.1:8000 启动'
+      return '无法连接后端服务，请检查 API 地址和服务状态'
     }
     return `请求失败（HTTP ${axiosError.response.status}）`
   }

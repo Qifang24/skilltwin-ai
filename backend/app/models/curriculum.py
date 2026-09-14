@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base, TimestampMixin
@@ -79,6 +79,7 @@ class CurriculumImportBatch(Base, TimestampMixin):
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     file_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     storage_path: Mapped[str] = mapped_column(String(1024), nullable=False)
+    file_content: Mapped[bytes | None] = mapped_column(LargeBinary)
     status: Mapped[str] = mapped_column(String(32), default="parsed", nullable=False)
     source_name: Mapped[str] = mapped_column(String(255), nullable=False)
     source_url: Mapped[str | None] = mapped_column(String(1024))

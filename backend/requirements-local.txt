@@ -1,0 +1,8 @@
+# Local and Docker runtime: cloud dependencies plus local embedding and Chroma.
+-r requirements.txt
+uvicorn[standard]==0.32.1
+alembic>=1.14.0,<2.0.0
+chromadb>=1.0.0,<2.0.0
+sentence-transformers>=3.0.0
+pytest>=8.0.0
+pytest-asyncio>=0.24.0

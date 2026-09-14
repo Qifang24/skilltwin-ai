@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.enums import DataFlag
 from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.models.job_market import JobImportBatch, JobImportRow, JobPosting, JobSkillCandidate
@@ -68,8 +69,9 @@ def _decode_csv(content: bytes) -> str:
 def parse_job_file(filename: str, content: bytes) -> tuple[list[str], list[dict[str, Any]]]:
     if not content:
         raise ValidationError("上传文件为空。")
-    if len(content) > MAX_BYTES:
-        raise ValidationError("岗位文件超过 10MB 限制。")
+    limit = 4 * 1024 * 1024 if settings.file_storage == "database" else MAX_BYTES
+    if len(content) > limit:
+        raise ValidationError(f"岗位文件超过 {limit // (1024 * 1024)}MB 限制。")
     suffix = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
     if suffix == "csv":
         reader = csv.DictReader(io.StringIO(_decode_csv(content)))

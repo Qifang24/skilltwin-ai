@@ -41,6 +41,8 @@ knowledge/**/*.doc
 node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/.vercel/
+.vercel/
 *.local
 phase16-*.png
 backups/

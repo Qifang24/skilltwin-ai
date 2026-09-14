@@ -107,6 +107,14 @@ class HybridRetriever:
             self._bm25 = BM25Index.load(BM25_INDEX_PATH)
         return self._bm25
 
+    def _sparse_index(self, db: Session) -> BM25Index:
+        if self._bm25 is not None or settings.vector_store != "sql":
+            return self.bm25
+        rows = db.execute(select(KnowledgeChunk.id, KnowledgeChunk.text)).all()
+        index = BM25Index()
+        index.build([row.id for row in rows], [row.text for row in rows])
+        return index
+
     def search(
         self,
         db: Session,
@@ -139,7 +147,7 @@ class HybridRetriever:
         # ---- 通路 2：BM25 ----
         sparse_ids: list[str] = []
         if k_sparse > 0:
-            sparse_ids = [hit.chunk_id for hit in self.bm25.search(query, k_sparse)]
+            sparse_ids = [hit.chunk_id for hit in self._sparse_index(db).search(query, k_sparse)]
 
         if not dense_ids and not sparse_ids:
             return []
