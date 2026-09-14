@@ -11,7 +11,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.enums import DataFlag, SkillStatus
@@ -77,9 +77,11 @@ class JobMarketService:
             delete(JobPostingSkill).where(JobPostingSkill.posting_id == posting.id)
         )
         created = 0
+        declared_skills = str((posting.extra or {}).get("declared_skills") or "").strip()
+        source_text = posting.raw_text + (f"\n技能要求：{declared_skills}" if declared_skills else "")
         for skill in skills:
             for term in self._terms_for_skill(skill):
-                match = re.search(re.escape(term), posting.raw_text, flags=re.IGNORECASE)
+                match = re.search(re.escape(term), source_text, flags=re.IGNORECASE)
                 if match is None:
                     continue
                 self._db.add(
@@ -87,7 +89,7 @@ class JobMarketService:
                         posting_id=posting.id,
                         skill_code=skill.skill_code,
                         evidence_span=self._sentence_span(
-                            posting.raw_text, match.start(), match.end()
+                            source_text, match.start(), match.end()
                         ),
                         extractor=RULE_EXTRACTOR,
                         extractor_version="2026-08",
@@ -216,6 +218,15 @@ class JobMarketService:
                 window_end=end,
                 now=now,
             )
+        # A rebuilt market snapshot invalidates prior curriculum recommendations.
+        # Keep the historical teacher decisions, but make their stale state
+        # explicit until the teacher reruns coverage analysis and optimization.
+        from app.models.curriculum import OptimizationRun
+        self._db.execute(
+            update(OptimizationRun)
+            .where(OptimizationRun.job_id == job_id, OptimizationRun.is_stale.is_(False))
+            .values(is_stale=True)
+        )
         self._db.flush()
 
         dashboard = self.dashboard(job_id)
@@ -328,16 +339,155 @@ class JobMarketService:
             for link, posting in rows
         ]
 
+    def _dashboard_from_filtered_postings(
+        self,
+        job: Job,
+        postings: list[JobPosting],
+        *,
+        top_n: int,
+        trend_skill_codes: list[str] | None,
+    ) -> JobMarketDashboardRead:
+        """按教师筛选条件即时计算；不写入全量统计快照。"""
+        real_postings = [posting for posting in postings if posting.data_flag is DataFlag.REAL]
+        analysis_postings = real_postings or postings
+        total = len(postings)
+        real = len(real_postings)
+        demo = total - real
+        with_skills = sum(bool(posting.skills) for posting in analysis_postings)
+        missing_date = sum(posting.posted_at is None for posting in analysis_postings)
+        fingerprints = Counter(re.sub(r"\s+", "", posting.raw_text).casefold() for posting in analysis_postings)
+        duplicate_count = sum(count - 1 for count in fingerprints.values() if count > 1)
+        dated = [posting.posted_at for posting in analysis_postings if posting.posted_at]
+        warnings: list[str] = []
+        if not postings:
+            warnings.append("当前筛选条件下没有岗位样本，请调整筛选条件后重试。")
+        if real and real < 30:
+            warnings.append(f"筛选后的真实样本为 {real} 条，低于建议的 30 条；结果适合教学参考，不宜作稳定趋势判断。")
+        if missing_date:
+            warnings.append(f"{missing_date} 条筛选样本缺少发布日期，已计入技能排名但不计入月度趋势。")
+        if analysis_postings and with_skills < len(analysis_postings):
+            warnings.append(f"{len(analysis_postings) - with_skills} 条筛选样本未匹配到规范技能，需补充技能别名或人工复核原文。")
+        quality = MarketDataQualityRead(
+            total_postings=total,
+            real_postings=real,
+            demo_postings=demo,
+            postings_with_skills=with_skills,
+            extraction_coverage=with_skills / len(analysis_postings) if analysis_postings else 0.0,
+            missing_posted_at=missing_date,
+            duplicate_raw_text_count=duplicate_count,
+            latest_posted_at=max(dated) if dated else None,
+            warnings=warnings,
+        )
+
+        mentions: dict[str, set[str]] = defaultdict(set)
+        spans: dict[str, list[tuple[JobPosting, str]]] = defaultdict(list)
+        for posting in analysis_postings:
+            for link in posting.skills:
+                mentions[link.skill_code].add(posting.id)
+                spans[link.skill_code].append((posting, link.evidence_span))
+        skill_codes = sorted(mentions, key=lambda code: (-len(mentions[code]), code))[:top_n]
+        skills = {
+            skill.skill_code: skill
+            for skill in self._db.execute(select(Skill).where(Skill.skill_code.in_(skill_codes))).scalars()
+        } if skill_codes else {}
+
+        def evidence_for(code: str) -> list[DemandEvidenceRead]:
+            return [
+                DemandEvidenceRead(
+                    posting_id=posting.id,
+                    title=posting.title,
+                    company_type=posting.company_type,
+                    city=posting.city,
+                    posted_at=posting.posted_at,
+                    source_name=posting.source_name,
+                    source_url=posting.source_url,
+                    data_flag=posting.data_flag,
+                    evidence_span=span,
+                )
+                for posting, span in sorted(
+                    spans[code], key=lambda row: (row[0].posted_at is not None, row[0].posted_at, row[0].id), reverse=True
+                )[:5]
+            ]
+
+        ranking = [
+            SkillDemandRead(
+                skill_code=code,
+                skill_name=skills.get(code).name_zh if code in skills else None,
+                category=skills.get(code).category.value if code in skills else None,
+                posting_count=len(mentions[code]),
+                total_postings=len(analysis_postings),
+                frequency=len(mentions[code]) / len(analysis_postings) if analysis_postings else 0.0,
+                real_posting_count=real,
+                demo_posting_count=demo,
+                is_demo_contaminated=not bool(real) and bool(demo),
+                evidence=evidence_for(code),
+            )
+            for code in skill_codes
+        ]
+        requested = trend_skill_codes or skill_codes[:5]
+        by_month: dict[tuple[datetime, datetime], list[JobPosting]] = defaultdict(list)
+        for posting in analysis_postings:
+            if posting.posted_at:
+                by_month[self._month_window(posting.posted_at)].append(posting)
+        trends = []
+        for code in requested:
+            points = []
+            for (start, end), month_postings in sorted(by_month.items()):
+                count = sum(any(link.skill_code == code for link in posting.skills) for posting in month_postings)
+                if count:
+                    points.append(SkillTrendPointRead(
+                        window_start=start, window_end=end, posting_count=count,
+                        total_postings=len(month_postings), frequency=count / len(month_postings),
+                        real_posting_count=sum(p.data_flag is DataFlag.REAL for p in month_postings),
+                        demo_posting_count=sum(p.data_flag is DataFlag.DEMO for p in month_postings),
+                    ))
+            if points:
+                trends.append(SkillTrendSeriesRead(skill_code=code, skill_name=skills.get(code).name_zh if code in skills else None, points=points))
+        return JobMarketDashboardRead(
+            job_id=job.id, job_name=job.name, data_quality=quality, ranking=ranking,
+            trends=trends, computed_at=datetime.now(timezone.utc),
+        )
+
     def dashboard(
         self,
         job_id: str,
         *,
         top_n: int = 10,
         trend_skill_codes: list[str] | None = None,
+        city: str | None = None,
+        source: str | None = None,
+        title: str | None = None,
+        posted_from: datetime | None = None,
+        posted_to: datetime | None = None,
     ) -> JobMarketDashboardRead:
         job = self._db.get(Job, job_id)
         if job is None:
             raise NotFoundError(f"未找到岗位：{job_id}", detail={"job_id": job_id})
+
+        if any((city, source, title, posted_from, posted_to)):
+            statement = (
+                select(JobPosting)
+                .options(selectinload(JobPosting.skills))
+                .where(JobPosting.job_id == job_id)
+                .order_by(JobPosting.id)
+            )
+            if city:
+                statement = statement.where(JobPosting.city.ilike(f"%{city.strip()}%"))
+            if source:
+                statement = statement.where(JobPosting.source_name.ilike(f"%{source.strip()}%"))
+            if title:
+                statement = statement.where(JobPosting.title.ilike(f"%{title.strip()}%"))
+            if posted_from:
+                statement = statement.where(JobPosting.posted_at >= posted_from)
+            if posted_to:
+                statement = statement.where(JobPosting.posted_at <= posted_to)
+            postings = list(self._db.execute(statement).scalars())
+            return self._dashboard_from_filtered_postings(
+                job,
+                postings,
+                top_n=top_n,
+                trend_skill_codes=trend_skill_codes,
+            )
 
         quality = self._quality(job_id)
         # 与 analyze() 的选择规则保持一致，避免旧快照或意外 DEMO 证据混入

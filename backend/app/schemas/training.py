@@ -78,6 +78,8 @@ class TrainingTaskSummary(BaseModel):
     id: str
     job_id: str
     source_node_id: str | None = None
+    plan_id: str | None = None
+    course_id: str | None = None
     title: str
     difficulty: TaskDifficulty
     est_minutes: int | None = None
@@ -86,6 +88,47 @@ class TrainingTaskSummary(BaseModel):
     edited_by_human: bool
     published_by: str | None = None
     skill_count: int = 0
+
+
+class TaskCurriculumPlanRead(BaseModel):
+    """任务关联的培养方案快照视图（数据仍以方案表为准）。"""
+
+    id: str
+    name: str
+    profession: str | None = None
+    version: str | None = None
+    source_name: str
+    source_url: str | None = None
+    is_partial: bool
+
+
+class TaskCurriculumCourseRead(BaseModel):
+    """任务关联课程的教学上下文。"""
+
+    id: str
+    plan_id: str
+    course_code: str | None = None
+    name: str
+    category: str | None = None
+    total_hours: int | None = None
+    objectives: str | None = None
+    description: str | None = None
+    teaching_content: str | None = None
+    knowledge_points: str | None = None
+    practical_content: str | None = None
+    learning_outcomes: str | None = None
+
+
+class TaskCourseEvidenceRead(BaseModel):
+    """课程原文或课程—技能映射中的可核验证据。"""
+
+    evidence_type: str = Field(description="course_source | course_field | skill_coverage")
+    field: str | None = None
+    skill_code: str | None = None
+    chunk_id: str | None = None
+    page: str | None = None
+    quote: str
+    is_generation_snapshot: bool = False
 
 
 class TrainingTaskDetail(TrainingTaskSummary):
@@ -103,6 +146,9 @@ class TrainingTaskDetail(TrainingTaskSummary):
     warnings: list[str] = Field(default_factory=list)
     #: 来源能力节点名称，便于展示「本任务由哪项能力派生」
     source_node_name: str | None = None
+    curriculum_plan: TaskCurriculumPlanRead | None = None
+    curriculum_course: TaskCurriculumCourseRead | None = None
+    course_evidence: list[TaskCourseEvidenceRead] = Field(default_factory=list)
 
 
 class GenerateTaskRequest(BaseModel):
@@ -111,10 +157,26 @@ class GenerateTaskRequest(BaseModel):
     difficulty: TaskDifficulty = TaskDifficulty.BEGINNER
     #: 可选的情境要求，如「结合自动驾驶道路场景」
     context: str | None = Field(default=None, max_length=200)
+    #: 两项均为可选，保证旧客户端只提交 node_id 的请求继续可用。
+    #: 只选择课程时，服务端会从课程记录推导 plan_id。
+    plan_id: str | None = Field(default=None, min_length=1, max_length=96)
+    course_id: str | None = Field(default=None, min_length=1, max_length=128)
 
 
 class PublishTaskRequest(BaseModel):
     published_by: str = Field(min_length=1, max_length=128)
+
+
+class TaskSkillUpdate(BaseModel):
+    skill_code: str = Field(min_length=1, max_length=96)
+    weight: float = Field(ge=0, le=1)
+    target_level: int | None = Field(default=None, ge=1, le=4)
+
+
+class UpdateTrainingTaskRequest(TrainingTaskDraft):
+    """教师可修改任务的全部教学内容；发布状态保持不变。"""
+
+    skills: list[TaskSkillUpdate] = Field(min_length=1, max_length=20)
 
 
 class TaskGenerationSources(BaseModel):

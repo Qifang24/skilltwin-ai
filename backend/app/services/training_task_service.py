@@ -21,6 +21,7 @@ from app.core.enums import GraphStatus, SKILL_BEARING_NODE_TYPES, TaskStatus
 from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.core.logging import get_logger
 from app.models.competency import CompetencyGraph, CompetencyNode
+from app.models.curriculum import CourseSkillCoverage, CurriculumCourse, CurriculumPlan
 from app.models.ontology import Skill
 from app.models.training import TrainingTask, TrainingTaskSkill
 from app.schemas.common import SourceRef
@@ -34,6 +35,107 @@ logger = get_logger(__name__)
 class TaskPersistResult:
     task: TrainingTask
     warnings: list[str]
+
+
+@dataclass
+class CurriculumTaskContext:
+    """经服务端校验、可安全交给任务生成器的课程上下文。"""
+
+    plan: CurriculumPlan
+    course: CurriculumCourse | None
+    mappings: list[CourseSkillCoverage]
+    warnings: list[str]
+
+    def prompt_text(self) -> str:
+        lines = [
+            f"培养方案：{self.plan.name}",
+            f"方案版本：{self.plan.version or '未标注'}",
+            f"方案来源：{self.plan.source_name}",
+        ]
+        if self.course is None:
+            lines.append("本次未指定具体课程；任务需保持与该培养方案及目标能力一致。")
+            return "\n".join(lines)
+
+        course = self.course
+        lines.extend(
+            [
+                f"课程：{course.name}"
+                + (f"（{course.course_code}）" if course.course_code else ""),
+                f"课程类别：{course.category or '未标注'}；总学时：{course.total_hours if course.total_hours is not None else '未标注'}",
+            ]
+        )
+        for label, value in (
+            ("课程目标", course.objectives),
+            ("课程简介", course.description),
+            ("教学内容", course.teaching_content),
+            ("知识点", course.knowledge_points),
+            ("实践内容", course.practical_content),
+            ("学习成果", course.learning_outcomes),
+        ):
+            if value:
+                lines.append(f"{label}：{value[:1200]}")
+        if course.source_quote:
+            lines.append(f"课程原文：{course.source_quote[:2000]}")
+        if self.mappings:
+            lines.append("课程已核验的技能覆盖：")
+            for mapping in self.mappings:
+                lines.append(
+                    f"- {mapping.skill_code}（{mapping.coverage_status}）："
+                    f"{mapping.evidence_quote[:400] or '未提供映射引文'}"
+                )
+        return "\n".join(lines)
+
+    def evidence_snapshot(self) -> list[dict]:
+        """固化生成当时使用的课程证据，避免后续课程编辑造成依据漂移。"""
+        if self.course is None:
+            return []
+        course = self.course
+        common = {
+            "plan_id": self.plan.id,
+            "plan_name": self.plan.name,
+            "course_id": course.id,
+            "course_name": course.name,
+            "is_generation_snapshot": True,
+        }
+        evidence: list[dict] = []
+        if course.source_quote:
+            evidence.append(
+                {
+                    **common,
+                    "evidence_type": "course_source",
+                    "field": "source_quote",
+                    "chunk_id": course.source_chunk_id,
+                    "page": course.source_page,
+                    "quote": course.source_quote,
+                }
+            )
+        for field, raw in (course.field_evidence or {}).items():
+            if not isinstance(raw, dict) or not raw.get("quote"):
+                continue
+            evidence.append(
+                {
+                    **common,
+                    "evidence_type": "course_field",
+                    "field": field,
+                    "chunk_id": raw.get("chunk_id") or course.source_chunk_id,
+                    "page": raw.get("page") or course.source_page,
+                    "quote": str(raw["quote"]),
+                }
+            )
+        for mapping in self.mappings:
+            if not mapping.evidence_quote:
+                continue
+            evidence.append(
+                {
+                    **common,
+                    "evidence_type": "skill_coverage",
+                    "skill_code": mapping.skill_code,
+                    "chunk_id": mapping.source_chunk_id,
+                    "page": mapping.source_page,
+                    "quote": mapping.evidence_quote,
+                }
+            )
+        return evidence
 
 
 class TrainingTaskService:
@@ -86,6 +188,77 @@ class TrainingTaskService:
             out.extend(self._descendants(child))
         return out
 
+    def curriculum_context(
+        self,
+        node: CompetencyNode,
+        *,
+        plan_id: str | None = None,
+        course_id: str | None = None,
+    ) -> CurriculumTaskContext | None:
+        """解析可选课程选择，并用技能映射检查它与能力节点的关联。
+
+        ``course_id`` 可以单独提交，方案会从课程记录推导。映射缺失或暂时
+        没有交集时只警告而不拒绝：导入后的人工映射可能尚未完成，但结构外键
+        仍然是有效且有价值的追溯信息。
+        """
+        if plan_id is None and course_id is None:
+            return None
+
+        course = self._db.get(CurriculumCourse, course_id) if course_id else None
+        if course_id and course is None:
+            raise NotFoundError(f"未找到课程：{course_id}", detail={"course_id": course_id})
+
+        resolved_plan_id = plan_id or (course.plan_id if course else None)
+        plan = self._db.get(CurriculumPlan, resolved_plan_id) if resolved_plan_id else None
+        if plan is None:
+            raise NotFoundError(
+                f"未找到培养方案：{resolved_plan_id}",
+                detail={"plan_id": resolved_plan_id},
+            )
+        if course is not None and course.plan_id != plan.id:
+            raise ValidationError(
+                "所选课程不属于所选培养方案。",
+                detail={
+                    "plan_id": plan.id,
+                    "course_id": course.id,
+                    "course_plan_id": course.plan_id,
+                },
+            )
+
+        mappings = (
+            list(
+                self._db.execute(
+                    select(CourseSkillCoverage)
+                    .where(
+                        CourseSkillCoverage.course_id == course.id,
+                        CourseSkillCoverage.coverage_status.in_(("covered", "partial")),
+                    )
+                    .order_by(CourseSkillCoverage.skill_code)
+                ).scalars()
+            )
+            if course
+            else []
+        )
+        warnings: list[str] = []
+        node_skill_codes = {
+            item.skill_code for item in self._descendants(node) if item.skill_code
+        }
+        mapped_codes = {item.skill_code for item in mappings}
+        if course and not mappings:
+            warnings.append(
+                f"课程「{course.name}」尚无已确认的技能覆盖映射；已保留课程关联，"
+                "请教师核对任务目标后再发布"
+            )
+        elif course and node_skill_codes and not (node_skill_codes & mapped_codes):
+            warnings.append(
+                f"课程「{course.name}」的技能覆盖与能力单元「{node.name}」暂无交集；"
+                "已保留两端证据，请教师确认课程选择是否合适"
+            )
+
+        return CurriculumTaskContext(
+            plan=plan, course=course, mappings=mappings, warnings=warnings
+        )
+
     # ------------------------------------------------------------ 持久化
     def persist(
         self,
@@ -94,9 +267,10 @@ class TrainingTaskService:
         draft: TrainingTaskDraft,
         sources: list[SourceRef],
         generation_run_id: str | None = None,
+        curriculum: CurriculumTaskContext | None = None,
     ) -> TaskPersistResult:
         graph = self._db.get(CompetencyGraph, node.graph_id)
-        warnings: list[str] = []
+        warnings: list[str] = list(curriculum.warnings) if curriculum else []
         normalizer = SkillNormalizer(self._db)
 
         # 该能力单元实际覆盖的技能及其掌握程度要求。
@@ -144,6 +318,8 @@ class TrainingTaskService:
             id=task_id,
             job_id=graph.job_id,
             source_node_id=node.id,
+            plan_id=curriculum.plan.id if curriculum else None,
+            course_id=curriculum.course.id if curriculum and curriculum.course else None,
             title=draft.title,
             scenario=draft.scenario,
             difficulty=draft.difficulty,
@@ -164,7 +340,8 @@ class TrainingTaskService:
                     "quote": s.quote,
                 }
                 for s in sources
-            ],
+            ]
+            + (curriculum.evidence_snapshot() if curriculum else []),
             generation_run_id=generation_run_id,
             status=TaskStatus.DRAFT,
         )

@@ -1,0 +1,20 @@
+/** Contracts for the auditable professional-construction workflow. */
+export type ImportRowState = 'valid' | 'warning' | 'error' | 'duplicate' | 'imported' | 'filtered'
+export interface ImportIssue { field?: string | null; code?: string | null; message: string; severity?: 'warning' | 'error' }
+export interface JobImportRow { row_number: number; state: ImportRowState; data: Record<string, string | number | boolean | null>; issues: ImportIssue[]; dedupe_match_id?: string | null }
+export interface JobImportBatch { id: string; job_id?: string | null; job_name?: string | null; status: string; headers: string[]; mapping: Record<string, string>; total_rows: number; rows?: JobImportRow[]; preview_rows?: JobImportRow[]; created_at?: string }
+export interface JobImportResult { batch_id: string; job_id: string; job_name?: string; created: number; updated: number; skipped_duplicates: number; filtered: number; failed: number; pii_scrubbed: number; rows: JobImportRow[]; analysis_status?: string; warnings: string[] }
+
+export interface ScopeOption { id: string; name: string; status?: string }
+export interface CurriculumDraftCourse { id: string; name: string; total_hours?: number | null; objectives?: string | null; overview?: string | null; teaching_content?: string | null; knowledge_points?: string | null; practice_content?: string | null; learning_outcomes?: string | null; evidence?: Record<string, { chunk_id?: string; page?: string; quote?: string }> }
+export interface CurriculumImportBatch { id: string; status: string; file_name?: string; plan_id?: string | null; plan_name?: string | null; warnings: string[]; courses: CurriculumDraftCourse[] }
+export type CoverageStatus = 'covered' | 'partial' | 'uncovered' | 'introduced' | 'practice' | 'unmapped'
+export interface CourseSkillMapping { id: string; course_id: string; course_name?: string; skill_code: string; skill_name?: string; coverage_status: CoverageStatus; origin: 'ai' | 'teacher' | 'manual' | 'rule'; confidence?: number | null; reason?: string | null; teacher_confirmed: boolean; edited_by?: string | null; evidence_quote?: string; source_chunk_id?: string; source_page?: string | null; evidence?: { chunk_id?: string; page?: string; quote?: string } }
+export interface CurriculumPlanDetail { id: string; name: string; courses: CurriculumDraftCourse[] }
+export interface SkillCoverageSummary { skill_code: string; skill_name?: string; status: CoverageStatus; demand_frequency?: number | null; posting_count?: number; graph_mastery?: number | null; courses: CourseSkillMapping[] }
+export interface CurriculumAnalysis { id: string; job_id: string; plan_id: string; graph_id: string; snapshot_version?: string; metrics: { course_count: number; mapped_skill_count: number; covered: number; partial: number; uncovered: number }; skills: SkillCoverageSummary[]; warnings: string[] }
+export interface EvidenceChain { skill_code: string; job_evidence: { title: string; quote: string; source_url?: string | null }[]; graph_evidence?: { node_name: string; mastery_level?: number | null }; course_evidence: { course_name: string; quote: string; page?: string | null; chunk_id?: string | null }[] }
+
+export type SuggestionState = 'pending' | 'adopted' | 'ignored'
+export interface OptimizationSuggestion { id: string; skill_code: string; skill_name?: string; priority_score: number; priority: 'high' | 'medium' | 'low'; action_type: string; title: string; suggestion: string; state: SuggestionState; teacher_note?: string | null; coverage_status: CoverageStatus; demand_frequency?: number | null; posting_count: number; mastery_level?: number | null; affected_courses: string[]; generation_reason: string; ai_generated: boolean; generation_run_id?: string | null; wording_reason?: string | null; evidence: EvidenceChain; updated_at?: string }
+export interface OptimizationRun { id: string; job_id: string; plan_id: string; graph_id: string; status: 'active' | 'stale'; low_sample: boolean; warnings: string[]; suggestions: OptimizationSuggestion[] }

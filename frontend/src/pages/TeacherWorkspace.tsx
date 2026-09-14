@@ -1,253 +1,124 @@
-/**
- * 教师工作台：图谱列表 + 生成入口。
- */
-
-import { App, Alert, Button, Card, Col, Row, Space, Table, Tag, Typography } from 'antd'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Button, Card, Col, Row, Space, Tag, Typography } from 'antd'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 
-import {
-  fetchGraphs,
-  fetchSkills,
-  fetchTasks,
-  generateGraph,
-  toErrorMessage,
-} from '@/services/api'
-import type { GraphSummary } from '@/types/graph'
-import { GRAPH_STATUS_COLORS, GRAPH_STATUS_LABELS } from '@/types/graph'
-import type { TrainingTaskSummary } from '@/types/training'
 import { PageHero } from '@/components/PageHero'
-import {
-  DIFFICULTY_COLORS,
-  DIFFICULTY_LABELS,
-  TASK_STATUS_COLORS,
-  TASK_STATUS_LABELS,
-} from '@/types/training'
+import { fetchGraphs, fetchJobMarketDashboard, fetchSkills, fetchStudents, fetchTasks } from '@/services/api'
 
 const { Title, Paragraph, Text } = Typography
-
 const TARGET_JOB = 'ai_data_annotator'
 
+/** 教师端首页只承担导航职责；图谱与实训内容分别在 STEP 02、03 模块管理。 */
 export function TeacherWorkspace() {
-  const { message } = App.useApp()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
-
-  const graphsQuery = useQuery({
-    queryKey: ['graphs'],
-    queryFn: () => fetchGraphs(),
-  })
-  const tasksQuery = useQuery({
-    queryKey: ['tasks'],
-    queryFn: () => fetchTasks(),
-  })
   const skillsQuery = useQuery({
     queryKey: ['skills', 'count'],
     queryFn: () => fetchSkills({ limit: 1 }),
   })
-
-  const generate = useMutation({
-    mutationFn: () => generateGraph(TARGET_JOB),
-    onSuccess: (graph) => {
-      message.success(`已生成草案：${graph.node_count} 个节点`)
-      queryClient.invalidateQueries({ queryKey: ['graphs'] })
-      navigate(`/teacher/graphs/${graph.id}`)
-    },
-    onError: (error) => message.error(toErrorMessage(error)),
+  const marketQuery = useQuery({
+    queryKey: ['job-market', TARGET_JOB],
+    queryFn: () => fetchJobMarketDashboard(TARGET_JOB),
   })
-
-  const columns = [
+  const graphsQuery = useQuery({ queryKey: ['graphs'], queryFn: () => fetchGraphs() })
+  const tasksQuery = useQuery({ queryKey: ['tasks'], queryFn: () => fetchTasks() })
+  const studentsQuery = useQuery({ queryKey: ['students'], queryFn: fetchStudents })
+  const skillCount = skillsQuery.data?.total ?? 0
+  const approvedGraph = graphsQuery.data?.items.find((graph) => graph.status === 'approved')
+  const draftGraph = graphsQuery.data?.items.find((graph) => graph.status === 'draft')
+  const projectStats = [
     {
-      title: '图谱',
-      dataIndex: 'title',
-      render: (title: string | null, row: GraphSummary) => (
-        <a onClick={() => navigate(`/teacher/graphs/${row.id}`)}>
-          {title ?? row.id}
-        </a>
-      ),
+      label: '岗位需求样本',
+      value: marketQuery.data?.data_quality.real_postings ?? 0,
+      suffix: '条真实 JD',
+      detail: marketQuery.data ? `已导入 ${marketQuery.data.data_quality.total_postings} 条岗位信息` : '正在读取岗位数据',
+      className: 'project-progress__item--brown',
     },
     {
-      title: '版本',
-      dataIndex: 'version',
-      width: 80,
-      render: (v: number) => `v${v}`,
+      label: '能力图谱',
+      value: approvedGraph ? '已审核' : draftGraph ? '待审核' : '未生成',
+      suffix: '',
+      detail: approvedGraph ? `${approvedGraph.node_count} 个节点可用于实训` : draftGraph ? '请进入 STEP 02 进行确认' : '请进入 STEP 02 生成图谱',
+      className: 'project-progress__item--pink',
     },
     {
-      title: '状态',
-      dataIndex: 'status',
-      width: 100,
-      render: (status: GraphSummary['status']) => (
-        <Tag color={GRAPH_STATUS_COLORS[status]}>{GRAPH_STATUS_LABELS[status]}</Tag>
-      ),
+      label: '实训任务',
+      value: tasksQuery.data?.total ?? 0,
+      suffix: '项',
+      detail: (tasksQuery.data?.total ?? 0) ? '可进入 STEP 03 查看与发布' : '确认图谱后即可生成',
+      className: 'project-progress__item--purple',
     },
-    { title: '节点数', dataIndex: 'node_count', width: 90 },
-    { title: '技能点', dataIndex: 'skill_point_count', width: 90 },
     {
-      title: '审核人',
-      dataIndex: 'approved_by',
-      width: 120,
-      render: (v: string | null) => v ?? <Text type="secondary">—</Text>,
+      label: '学生档案',
+      value: studentsQuery.data?.length ?? 0,
+      suffix: '名',
+      detail: (studentsQuery.data?.length ?? 0) ? '可在学生端开展诊断' : '创建学生后即可开展诊断',
+      className: 'project-progress__item--blue',
     },
   ]
 
-  const skillCount = skillsQuery.data?.total ?? 0
+  const workflowSteps = [
+    {
+      step: '01',
+      title: '分析岗位需求',
+      description: '基于真实招聘信息，梳理岗位所需技能和典型工作内容。',
+      label: '开始岗位分析',
+      onClick: () => navigate(`/teacher/market?job_id=${encodeURIComponent(TARGET_JOB)}`),
+    },
+    {
+      step: '02',
+      title: '构建岗位能力图谱',
+      description: '核对 AI 生成的能力、技能点和来源，确认后作为实训设计依据。',
+      label: '进入图谱审核',
+      onClick: () => navigate('/teacher/graphs'),
+    },
+    {
+      step: '03',
+      title: '生成并发布实训任务',
+      description: '依据已确认图谱生成学习型任务，检查后发布给学生完成。',
+      label: '生成实训任务',
+      onClick: () => navigate('/teacher/tasks'),
+    },
+  ]
 
   return (
-    <Space orientation="vertical" size={24} style={{ width: '100%' }}>
+    <Space className="teacher-workspace" orientation="vertical" size={14} style={{ width: '100%' }}>
       <PageHero
-        eyebrow="教师端 · 专业群建设"
-        title="从产业需求，走到教学实训"
-        description="以可回查的岗位证据为起点，形成能力图谱、课程 Gap、实训任务与培养方案优化的教学闭环。"
-        meta={<Space wrap><Tag color="blue">目标岗位：AI 数据标注工程师</Tag><Tag color="green">技能规范表 {skillCount} 条</Tag></Space>}
-        actions={<Button type="primary" onClick={() => navigate('/teacher/market')}>查看岗位需求</Button>}
+        eyebrow="教师工作台 · 实训任务设计"
+        title="从岗位需求到实训任务"
+        description="分析真实岗位需求，构建岗位能力图谱，生成并发布学生实训任务。"
+        meta={<Space wrap><Tag color="blue">目标岗位 · AI 数据标注工程师</Tag><Tag color="green">{skillCount} 条技能规范已就绪</Tag></Space>}
+        actions={<Button type="primary" onClick={() => navigate(`/teacher/market?job_id=${encodeURIComponent(TARGET_JOB)}`)}>从岗位需求开始</Button>}
       />
 
-      <Card className="workflow-card" title="比赛演示主线" extra={<Text type="secondary">证据驱动 · 每一步可回查</Text>}>
+      <Card className="workflow-card" title="三步完成实训任务设计" extra={<Text type="secondary">从真实岗位需求到可发布的学生实训任务</Text>}>
         <Row gutter={[12, 12]}>
-          {[
-            ['01', '产业需求', '查看公开 JD 的技能频率、趋势与原文证据', '/teacher/market', '岗位看板'],
-            ['02', '课程对标', '识别课程覆盖、未映射项与岗位能力 Gap', '/teacher/curriculum-gap', 'Gap 分析'],
-            ['03', '教学优化', '按需求频率与覆盖比例给出调整优先级', '/teacher/curriculum-optimization', '优化建议'],
-            ['04', '真实验证', '用匿名脚本记录教师与学生的实际使用反馈', '/teacher/user-testing', '测试报告'],
-          ].map(([step, title, description, route, label]) => (
-            <Col xs={24} sm={12} lg={6} key={step}>
-              <Card size="small" className="workflow-step">
-                <Tag color="blue">STEP {step}</Tag>
+          {workflowSteps.map(({ step, title, description, label, onClick }) => (
+            <Col xs={24} md={8} key={step}>
+              <Card size="small" className={`workflow-step workflow-step--${step}`}>
+                <div className="workflow-step__top"><span className="workflow-step__number">STEP {step}</span></div>
                 <Title level={5}>{title}</Title>
                 <Paragraph type="secondary">{description}</Paragraph>
-                <Button type="link" onClick={() => navigate(route)}>{label} →</Button>
+                <Button className="workflow-step__action" type="default" onClick={onClick}>{label} →</Button>
               </Card>
             </Col>
           ))}
         </Row>
       </Card>
 
-      <Card
-        title="岗位能力图谱"
-        extra={
-          <Button
-            type="primary"
-            loading={generate.isPending}
-            disabled={skillCount === 0}
-            onClick={() => generate.mutate()}
-          >
-            {generate.isPending ? '生成中（约 1 分钟）…' : '生成新图谱'}
-          </Button>
-        }
-      >
-        {skillCount === 0 && (
-          <Alert
-            type="warning"
-            showIcon
-            style={{ marginBottom: 16 }}
-            message="技能规范表为空"
-            description={
-              <span>
-                请先运行 <Text code>python scripts/seed_skills.py</Text> 载入技能表。
-                技能编码是全系统的关联键，没有它图谱无法生成。
-              </span>
-            }
-          />
-        )}
-
-        {generate.isPending && (
-          <Alert
-            type="info"
-            showIcon
-            style={{ marginBottom: 16 }}
-            message="正在检索标准条文并生成图谱"
-            description="包含知识库混合检索与模型生成两个阶段，请勿关闭页面。"
-          />
-        )}
-
-        <Table
-          rowKey="id"
-          size="small"
-          loading={graphsQuery.isLoading}
-          dataSource={graphsQuery.data?.items ?? []}
-          columns={columns}
-          pagination={false}
-          locale={{ emptyText: '暂无图谱，点击右上角生成' }}
-        />
+      <Card className="project-progress" title="当前教学项目进度" extra={<Text type="secondary">四项状态实时同步</Text>}>
+        <Row gutter={[12, 12]}>
+          {projectStats.map((stat) => (
+            <Col xs={12} lg={6} key={stat.label}>
+              <div className={`project-progress__item ${stat.className}`}>
+                <Text className="project-progress__label">{stat.label}</Text>
+                <div className="project-progress__value"><strong>{stat.value}</strong><span>{stat.suffix}</span></div>
+                <Text className="project-progress__detail">{stat.detail}</Text>
+              </div>
+            </Col>
+          ))}
+        </Row>
       </Card>
 
-      <Card
-        title="岗位需求趋势分析"
-        extra={<Button onClick={() => navigate('/teacher/market')}>进入看板</Button>}
-      >
-        <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          从已导入的公开岗位 JD 中提取有原文证据的技能需求排名与月度趋势。样本量、DEMO 标识和数据质量警告均会同时展示。
-        </Paragraph>
-      </Card>
-
-      <Card title="课程覆盖与岗位能力 Gap" extra={<Button onClick={() => navigate('/teacher/curriculum-gap')}>进入分析</Button>}>
-        <Paragraph type="secondary" style={{ marginBottom: 0 }}>按课程原文证据核验已覆盖技能；未结构化的课程会明确提示，避免将资料缺失误作培养缺口。</Paragraph>
-      </Card>
-      <Card title="人才培养方案优化建议" extra={<Button onClick={() => navigate('/teacher/curriculum-optimization')}>查看建议</Button>}>
-        <Paragraph type="secondary" style={{ marginBottom: 0 }}>仅在岗位样本可靠时，按“需求频率 × 未覆盖比例”生成可回溯的课程调整优先级。</Paragraph>
-      </Card>
-
-      <Card title="真实用户测试" extra={<Button onClick={() => navigate('/teacher/user-testing')}>记录与报告</Button>}>
-        <Paragraph type="secondary" style={{ marginBottom: 0 }}>使用教师、学生的匿名测试脚本记录实际结果、达成度与易用性；仅已完成的真实记录会被汇总，样本不足时系统不会生成结论。</Paragraph>
-      </Card>
-
-      <Card title="实训任务">
-        <Table
-          rowKey="id"
-          size="small"
-          loading={tasksQuery.isLoading}
-          dataSource={tasksQuery.data?.items ?? []}
-          pagination={false}
-          locale={{
-            emptyText: '暂无任务。打开已审核的图谱，点击能力单元节点即可生成',
-          }}
-          columns={[
-            {
-              title: '任务',
-              dataIndex: 'title',
-              render: (title: string, row: TrainingTaskSummary) => (
-                <a onClick={() => navigate(`/teacher/tasks/${row.id}`)}>{title}</a>
-              ),
-            },
-            {
-              title: '难度',
-              dataIndex: 'difficulty',
-              width: 90,
-              render: (d: TrainingTaskSummary['difficulty']) => (
-                <Tag color={DIFFICULTY_COLORS[d]}>{DIFFICULTY_LABELS[d]}</Tag>
-              ),
-            },
-            {
-              title: '状态',
-              dataIndex: 'status',
-              width: 100,
-              render: (s: TrainingTaskSummary['status']) => (
-                <Tag color={TASK_STATUS_COLORS[s]}>{TASK_STATUS_LABELS[s]}</Tag>
-              ),
-            },
-            { title: '训练技能', dataIndex: 'skill_count', width: 100 },
-            {
-              title: '用时',
-              dataIndex: 'est_minutes',
-              width: 90,
-              render: (m: number | null) => (m ? `${m} 分钟` : '—'),
-            },
-          ]}
-        />
-      </Card>
-
-      <Card size="small">
-        <Space orientation="vertical" size={4}>
-          <Text type="secondary">
-            技能规范表现有 <Text strong>{skillCount}</Text> 条，
-            均抽取自《人工智能训练师国家职业技能标准（2021年版）》，每条可溯源到具体页码。
-          </Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            图谱由 AI 生成草案、教师审核确认。审核通过后节点编码冻结，
-            供课程映射、实训任务与学生能力测评引用。
-          </Text>
-        </Space>
-      </Card>
     </Space>
   )
 }

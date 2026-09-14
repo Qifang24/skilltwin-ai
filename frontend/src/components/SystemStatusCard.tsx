@@ -5,7 +5,7 @@
  * 也是排查环境问题最快的入口（模型没配、GPU 没识别、向量库没就绪都能一眼看到）。
  */
 
-import { Alert, Card, Descriptions, Skeleton, Space, Tag } from 'antd'
+import { Alert, Card, Skeleton, Space, Tag } from 'antd'
 import { useQuery } from '@tanstack/react-query'
 
 import { fetchHealth, toErrorMessage } from '@/services/api'
@@ -54,35 +54,36 @@ export function SystemStatusCard() {
   const healthy = data.status === 'ok'
 
   return (
-    <Card
-      title="系统状态"
-      extra={
-        <Tag color={healthy ? 'success' : 'warning'}>
-          {healthy ? '全部就绪' : '部分组件未就绪'}
-        </Tag>
-      }
-    >
-      <Descriptions column={1} size="small" bordered>
-        <Descriptions.Item label="版本">
-          {data.app} v{data.version}
-        </Descriptions.Item>
-        <Descriptions.Item label="模型调用模式">
-          {DEMO_MODE_LABELS[data.demo_mode] ?? data.demo_mode}
-        </Descriptions.Item>
+    <Card className="system-status-card" bordered={false}>
+      <div className="system-status-card__overview">
+        <div>
+          <span className="system-status-card__eyebrow">SYSTEM HEALTH</span>
+          <h2>{healthy ? '系统运行正常' : '系统需要检查'}</h2>
+          <p>
+            {data.app} v{data.version} · {DEMO_MODE_LABELS[data.demo_mode] ?? data.demo_mode}
+          </p>
+        </div>
+        <div className={`system-status-card__summary ${healthy ? 'is-healthy' : 'is-warning'}`}>
+          <span className="system-status-card__pulse" />
+          <strong>{healthy ? '全部就绪' : '部分未就绪'}</strong>
+          <small>{data.components.filter((component) => component.ok).length} / {data.components.length} 核心服务可用</small>
+        </div>
+      </div>
+
+      <div className="system-status-card__grid">
         {data.components.map((component) => (
-          <Descriptions.Item
-            key={component.name}
-            label={COMPONENT_LABELS[component.name] ?? component.name}
-          >
-            <Space size={8} wrap>
-              <Tag color={component.ok ? 'success' : 'error'}>
-                {component.ok ? '正常' : '未就绪'}
-              </Tag>
-              <span style={{ color: 'rgba(0,0,0,0.65)' }}>{component.detail}</span>
-            </Space>
-          </Descriptions.Item>
+          <div className="system-status-card__item" key={component.name}>
+            <div className="system-status-card__item-title">
+              <span className={component.ok ? 'is-ok' : 'is-error'} />
+              {COMPONENT_LABELS[component.name] ?? component.name}
+            </div>
+            <p>{component.detail}</p>
+            <Tag color={component.ok ? 'success' : 'error'}>
+              {component.ok ? '运行正常' : '需要处理'}
+            </Tag>
+          </div>
         ))}
-      </Descriptions>
+      </div>
     </Card>
   )
 }

@@ -2,8 +2,6 @@ import {
   Alert,
   Button,
   Card,
-  Collapse,
-  Descriptions,
   Flex,
   Progress,
   Space,
@@ -15,7 +13,6 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 import type {
-  GenerateLearningPathResponse,
   LearningPath,
   LearningPathItem,
   PathStatus,
@@ -122,14 +119,15 @@ function PathItemRow({
   }
 
   return (
-    <div style={{ padding: '12px 0', borderBottom: '1px solid #f0f0f0' }}>
+    <Card size="small" className={`learning-path-item learning-path-item--${item.item_type}`}>
       <Flex justify="space-between" align="flex-start" gap={12} wrap>
         <Space orientation="vertical" size={3} style={{ flex: 1 }}>
           <Space size={6} wrap>
-            <Tag>{PATH_ITEM_LABELS[item.item_type]}</Tag>
-            <Text>{item.title}</Text>
-            {item.skill_code ? <Tag color="magenta">{item.skill_code}</Tag> : null}
-            <Tag color={PATH_STATUS_COLORS[item.status]}>
+            <Tag className={`learning-path-item__type learning-path-item__type--${item.item_type}`}>
+              {PATH_ITEM_LABELS[item.item_type]}
+            </Tag>
+            <Text strong>{item.title}</Text>
+            <Tag color={PATH_STATUS_COLORS[item.status]} className="learning-path-item__status">
               {PATH_STATUS_LABELS[item.status]}
             </Tag>
           </Space>
@@ -137,11 +135,6 @@ function PathItemRow({
             {item.description ? (
               <Text type="secondary" style={{ whiteSpace: 'pre-line' }}>
                 {item.description}
-              </Text>
-            ) : null}
-            {item.item_type === 'task' ? (
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                标记完成只记录学习进度；能力提升需由任务评分或复测证据确认。
               </Text>
             ) : null}
             {item.completed_at ? (
@@ -153,13 +146,12 @@ function PathItemRow({
         </Space>
         {actions.length ? <Space wrap>{actions}</Space> : null}
       </Flex>
-    </div>
+    </Card>
   )
 }
 
 interface LearningPathTimelineProps {
   path: LearningPath
-  generation?: GenerateLearningPathResponse
   regenerating: boolean
   retestPending: boolean
   updatingItemId?: string
@@ -170,7 +162,6 @@ interface LearningPathTimelineProps {
 
 export function LearningPathTimeline({
   path,
-  generation,
   regenerating,
   retestPending,
   updatingItemId,
@@ -178,28 +169,21 @@ export function LearningPathTimeline({
   onRetest,
   onItemStatus,
 }: LearningPathTimelineProps) {
-  const evidenceWarning =
-    generation?.evidence_sufficiency === 'insufficient'
-      ? '当前知识库没有为路径文案检索到足够依据；阶段顺序仍由已审核图谱、前置关系和能力 Gap 确定。'
-      : null
+  const currentPhase = path.phases.find((phase) => phase.status === 'active') ?? path.phases[0]
+  const nextItem = currentPhase?.items.find((item) => item.status === 'active') ?? currentPhase?.items[0]
 
   return (
     <Card
-      title={path.title ?? '个性化学习路径'}
+      title="我的个性化学习路径"
       extra={
         <Space>
-          {path.generation_run_id ? <Tag color="blue">AI 生成文案</Tag> : null}
-          <Button loading={regenerating} onClick={onRegenerate}>
-            根据最新画像刷新
+          <Button type="primary" className="learning-path-regenerate" loading={regenerating} onClick={onRegenerate}>
+            重新生成路径
           </Button>
         </Space>
       }
     >
       <Space orientation="vertical" size={16} style={{ width: '100%' }}>
-        {path.warnings.map((warning) => (
-          <Alert key={warning} type="warning" showIcon title={warning} />
-        ))}
-
         {path.status === 'archived' ? (
           <Alert
             type="info"
@@ -209,33 +193,31 @@ export function LearningPathTimeline({
           />
         ) : null}
 
-        {evidenceWarning ? (
-          <Alert type="warning" showIcon title="路径文案依据不足" description={evidenceWarning} />
+        {currentPhase && nextItem ? (
+          <Card className="learning-path-next-card" size="small" title="现在先做什么">
+            <Space orientation="vertical" size={5}>
+              <Space size={8} wrap>
+                <Tag color="blue">第 {currentPhase.order_index + 1} 阶段</Tag>
+                <Tag className={`learning-path-item__type learning-path-item__type--${nextItem.item_type}`}>
+                  {PATH_ITEM_LABELS[nextItem.item_type]}
+                </Tag>
+              </Space>
+              <Text strong>{nextItem.title}</Text>
+              {nextItem.description ? (
+                <div className="learning-path-next-card__description">
+                  {nextItem.description
+                    .split(/(?=\s*\d+\.\s)/)
+                    .filter(Boolean)
+                    .map((line, index) => (
+                      <Text key={`${index}-${line.slice(0, 12)}`} className="learning-path-next-card__line">
+                        {line.trim()}
+                      </Text>
+                    ))}
+                </div>
+              ) : null}
+            </Space>
+          </Card>
         ) : null}
-
-        {generation?.reasoning_summary ? (
-          <Alert
-            type="info"
-            showIcon
-            title="生成说明"
-            description={generation.reasoning_summary}
-          />
-        ) : null}
-
-        <Descriptions size="small" column={{ xs: 1, sm: 2, lg: 4 }} bordered>
-          <Descriptions.Item label="状态">
-            <Tag color={PATH_STATUS_COLORS[path.status]}>
-              {PATH_STATUS_LABELS[path.status]}
-            </Tag>
-          </Descriptions.Item>
-          <Descriptions.Item label="阶段数">{path.phases.length}</Descriptions.Item>
-          <Descriptions.Item label="排序方法">
-            {path.ordering_method ?? '—'}
-          </Descriptions.Item>
-          <Descriptions.Item label="生成时间">
-            {DATE_FORMATTER.format(new Date(path.created_at))}
-          </Descriptions.Item>
-        </Descriptions>
 
         <div>
           <Space style={{ marginBottom: 6 }}>
@@ -253,17 +235,6 @@ export function LearningPathTimeline({
           />
         </div>
 
-        {path.rationale ? (
-          <Paragraph style={{ marginBottom: 0 }}>{path.rationale}</Paragraph>
-        ) : null}
-
-        <Alert
-          type="info"
-          showIcon
-          title="关于阶段复测"
-          description="当前复测入口使用岗位综合题库，不是只覆盖本阶段技能的专项卷；结果会更新本次考查维度，其余维度由完整画像快照安全继承。"
-        />
-
         <Timeline
           items={path.phases.map((phase) => ({
             color: phase.status === 'completed' ? 'green' : 'blue',
@@ -271,7 +242,7 @@ export function LearningPathTimeline({
               <Card
                 key={phase.id}
                 size="small"
-                title={`Phase ${phase.order_index + 1} · ${phase.title}`}
+                title={`第 ${phase.order_index + 1} 阶段 · ${phase.title}`}
                 extra={
                   <Space>
                     <Tag color={PATH_STATUS_COLORS[phase.status]}>
@@ -285,19 +256,9 @@ export function LearningPathTimeline({
               >
                 <Space orientation="vertical" size={10} style={{ width: '100%' }}>
                   {phase.description ? (
-                    <Paragraph style={{ marginBottom: 0 }}>{phase.description}</Paragraph>
-                  ) : null}
-                  <Space size={[4, 6]} wrap>
-                    {phase.target_skill_codes.map((code) => (
-                      <Tag key={code} color="purple">
-                        {code}
-                      </Tag>
-                    ))}
-                  </Space>
-                  {phase.ordering_note ? (
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      排序依据：{phase.ordering_note}
-                    </Text>
+                    <Paragraph ellipsis={{ rows: 2, expandable: 'collapsible', symbol: '查看阶段说明' }} style={{ marginBottom: 0 }}>
+                      {phase.description}
+                    </Paragraph>
                   ) : null}
                   <Progress
                     percent={phase.progress.percent}
@@ -323,42 +284,6 @@ export function LearningPathTimeline({
             ),
           }))}
         />
-
-        {generation?.sources.length ? (
-          <Collapse
-            size="small"
-            items={[
-              {
-                key: 'sources',
-                label: `路径文案参考依据（${generation.sources.length}）`,
-                children: (
-                  <Space orientation="vertical" size={8} style={{ width: '100%' }}>
-                    {generation.sources.map((source, index) => (
-                      <div
-                        key={`${source.chunk_id ?? source.source_name ?? 'source'}-${index}`}
-                        style={{ paddingBottom: 8, borderBottom: '1px solid #f0f0f0' }}
-                      >
-                        <Text strong>
-                          {source.source_name ?? source.chunk_id ?? '知识库来源'}
-                        </Text>
-                        <br />
-                        <Text type="secondary">
-                          {[
-                            source.section,
-                            source.page ? `第 ${source.page} 页` : null,
-                            source.quote,
-                          ]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </Text>
-                      </div>
-                    ))}
-                  </Space>
-                ),
-              },
-            ]}
-          />
-        ) : null}
       </Space>
     </Card>
   )

@@ -55,6 +55,9 @@ class CompetencyGraph(Base, TimestampMixin):
     )
     approved_by: Mapped[str | None] = mapped_column(String(128))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    selected_skill_codes: Mapped[list[str]] = mapped_column(
+        MutableList.as_mutable(JSON), default=list, nullable=False
+    )
 
     job: Mapped["Job"] = relationship(back_populates="graphs")  # noqa: F821
     nodes: Mapped[list["CompetencyNode"]] = relationship(
@@ -92,6 +95,8 @@ class CompetencyNode(Base, TimestampMixin):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
+    #: 教师审核时记录的教学观察或修改理由，不参与 AI 生成。
+    teacher_note: Mapped[str | None] = mapped_column(Text)
 
     #: 仅 skill_point / knowledge_point 必填 —— 学生能力向量的维度来源
     skill_code: Mapped[str | None] = mapped_column(

@@ -28,6 +28,7 @@ data/chroma/
 data/raw/
 data/cache/
 data/review/
+data/curriculum_uploads/
 *.bm25.pkl
 data/bm25_knowledge.pkl
 

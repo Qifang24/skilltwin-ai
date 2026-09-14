@@ -17,6 +17,7 @@ class NodeUpdateRequest(BaseModel):
 
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=1000)
+    teacher_note: str | None = Field(default=None, max_length=2000)
     skill_code: str | None = Field(default=None, max_length=96)
     mastery_level: int | None = Field(default=None, ge=1, le=4)
     order_index: int | None = Field(default=None, ge=0)
@@ -46,3 +47,17 @@ class NodeCreateRequest(BaseModel):
                 f"可用类型：{sorted(t.value for t in GENERATABLE_TYPES)}"
             )
         return self
+
+
+class JobEvidenceCandidateRead(BaseModel):
+    posting_id: str
+    title: str
+    city: str | None = None
+    posted_at: str | None = None
+    source_name: str | None = None
+    source_url: str | None = None
+    evidence_span: str
+
+
+class LinkJobEvidenceRequest(BaseModel):
+    posting_ids: list[str] = Field(default_factory=list, max_length=5)

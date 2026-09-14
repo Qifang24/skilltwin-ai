@@ -1,5 +1,5 @@
 {
-  "_comment": "TEMPLATE ONLY — 请复制为 data/seed/curriculum_<school>_<year>.json 后填写。所有 evidence/source_quote 必须逐字来自已入库的校本方案知识块；不要把本模板直接导入。",
+  "_comment": "TEMPLATE ONLY — 请复制为 data/seed/curriculum_<school>_<year>.json 后填写。所有 evidence/source_quote 必须逐字来自已入库的校本方案知识块；不要把本模板直接导入。字段可留空，但不得用模板文字冒充课程事实。",
   "plan": {
     "id": "replace_with_school_ai_2026",
     "name": "替换为学校与培养方案全名",
@@ -18,9 +18,23 @@
       "course_code": null,
       "category": "专业核心课程",
       "total_hours": 0,
+      "objectives": "替换为课程目标原文或结构化摘要",
+      "description": "替换为课程简介原文或结构化摘要",
+      "teaching_content": "替换为教学内容原文或结构化摘要",
+      "knowledge_points": "替换为知识点原文或结构化摘要",
+      "practical_content": "替换为实践内容原文或结构化摘要",
+      "learning_outcomes": "替换为学习成果原文或结构化摘要",
       "source_chunk_id": "replace_with_doc_id_chunk_index",
       "source_page": null,
-      "source_quote": "替换为该知识块内可定位到课程名称、学时或课程说明的原文"
+      "source_quote": "替换为该知识块内可定位到课程名称、学时或课程说明的连续原文",
+      "evidence": {
+        "objectives": {"chunk_id": "replace_with_chunk_id", "page": null, "quote": "替换为课程目标连续原文"},
+        "description": {"chunk_id": "replace_with_chunk_id", "page": null, "quote": "替换为课程简介连续原文"},
+        "teaching_content": {"chunk_id": "replace_with_chunk_id", "page": null, "quote": "替换为教学内容连续原文"},
+        "knowledge_points": {"chunk_id": "replace_with_chunk_id", "page": null, "quote": "替换为知识点连续原文"},
+        "practical_content": {"chunk_id": "replace_with_chunk_id", "page": null, "quote": "替换为实践内容连续原文"},
+        "learning_outcomes": {"chunk_id": "replace_with_chunk_id", "page": null, "quote": "替换为学习成果连续原文"}
+      }
     }
   ],
   "coverage": [
@@ -28,6 +42,13 @@
       "course_id": "replace_with_stable_course_id",
       "skill_code": "replace_with_existing_skill_code",
       "coverage_strength": 1,
+      "coverage_status": "partial",
+      "origin": "teacher_entered",
+      "confidence": 0.0,
+      "reason": "替换为基于课程原文的说明",
+      "generation_run_id": null,
+      "teacher_confirmed": false,
+      "edited_by": null,
       "source_chunk_id": "replace_with_doc_id_chunk_index",
       "source_page": null,
       "evidence_quote": "替换为该知识块内明确涉及本技能的原文"
